@@ -1,11 +1,3 @@
-module _MLP
-    export MLP
-
-    mutable struct MLP
-        x
-        MLP(x) = new(x)
-    end
+mutable struct MLP
     
-    function hoge() return 0 end
-
 end
