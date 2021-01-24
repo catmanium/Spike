@@ -1,4 +1,7 @@
 module Layers
+#=================================
+・params,gradsは共通で持たせる
+==================================#
 
 #=====Affine==============#
 mutable struct Affine
@@ -16,7 +19,7 @@ function backward(this::Affine,din)
     this.grads[2] .= sum(din,1)
     return din * (layer.params[1])'
 end
-function add_Affine(in_neurons,out_neurons)
+function add_Affine(in_neurons,out_neurons,option)
     W = randn(in_neurons,out_neurons)
     b = zeros(1,out_neurons)
     return Affine(W,b)
@@ -88,7 +91,7 @@ function backward(this::uni_LSTM,dh_next,dc_next)
 
     return dx, dh_prev, dc_prev
 end
-function add_LSTM(in_neurons,out_neurons)
+function add_uni_LSTM(in_neurons,out_neurons,option)
     Wx = randn(in_neurons,4*out_neurons)/sqrt(in_neurons)
     Wh = randn(out_neurons,4*out_neurons)/sqrt(out_neurons)
     b = zeros(1,4*out_neurons)
@@ -142,7 +145,7 @@ function forward(this::LSTM,xs)
     return hs
 end
         #後で改善
-function backward(this:LSTM,dhs)
+function backward(this::LSTM,dhs)
     Wx, Wh, b = this.params
     D, H = size(Wx)
     
@@ -196,10 +199,11 @@ function backward(this:LSTM,dhs)
 
     return dxs
 end
-function add_LSTM(in_neurons,out_neurons)
+function add_LSTM(in_neurons,out_neurons,option)
     Wx = randn(in_neurons,4*out_neurons)/sqrt(in_neurons)
     Wh = randn(out_neurons,4*out_neurons)/sqrt(out_neurons)
     b = zeros(1,4*out_neurons)
+    stateful = option["stateful"]
 
     return LSTM(Wx,Wh,b)
 end
@@ -227,4 +231,6 @@ function backward(this::Sigmoid_with_loss,din)
 end
 function add_Sigmoid_with_loss()
     return Sigmoid_with_loss()
+end
+
 end

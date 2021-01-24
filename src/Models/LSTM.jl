@@ -1,4 +1,4 @@
-include("../src/Layers.jl")
+include("common.jl")
 
 mutable struct LSTM_struct
     params
@@ -6,22 +6,19 @@ mutable struct LSTM_struct
     layers
     optimizer
     padding
+    LSTM_struct() = new([],[],[],nothing,nothing)
 end
 
-function LSTM(layer_and_neurons,loss,out_sequences)
-    layers = []
-
-    #レイヤの生成
-    pre_neuron = layer_and_neurons["input"]
-    for l_n in layer_and_neurons[2:end] #inputの除外
-        layer = l_n[1]
-        neurons = l_n[2]
-
-        for neuron in neurons
-            func_layer = string("Layers.add_$(layer)($(pre_neuron),$(neuron))")
-            pre_neuron = neuron
-        end
-
-        append!(layers,eval(func_layer))
+function LSTM(;layer_and_neurons=[],loss_layer=nothing,option=Dict())
+    if isempty(option)
+        #デフォルト設定
+        option = Dict(
+            "stateful" => false,
+            "out_sequence" => false,
+            "padding" => nothing
+        )
     end
+    model = LSTM_struct()
+    format_model(model,layer_and_neurons,loss_layer,option)
+    return model
 end
