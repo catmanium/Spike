@@ -1,6 +1,10 @@
 module Layers
+
+using UnPack
 #=================================
 ・params,gradsは共通で持たせる
+・add_レイヤ：コンストラクタは配列で返す．
+・
 ==================================#
 
 #=====Affine==============#
@@ -16,13 +20,21 @@ function forward(this::Affine,in)
 end
 function backward(this::Affine,din)
     this.grads[1] .= (this.in)' * din
-    this.grads[2] .= sum(din,1)
-    return din * (layer.params[1])'
+    this.grads[2] .= sum(din,dims=1)
+    return din * (this.params[1])'
 end
-function add_Affine(in_neurons,out_neurons,option)
-    W = randn(in_neurons,out_neurons)
-    b = zeros(1,out_neurons)
-    return Affine(W,b)
+function add_Affine(pre_neuron,neurons,option)
+    layers = []
+    for neuron in neurons
+        W = randn(pre_neuron,neuron)
+        b = zeros(1,neuron)
+        pre_neuron = neuron
+        append!(layers,[Affine(W,b)])
+    end
+    return layers
+end
+function reset(this::Affine)
+    return 0
 end
 
 #=====uni_LSTM==============#
@@ -35,7 +47,6 @@ end
 function forward(this::uni_LSTM,x,h_prev,c_prev)
     Wx, Wh, b = this.params
     N, H = size(h_prev)
-
     A = x * Wx + h_prev * Wh .+ b
 
     #slice
@@ -50,9 +61,10 @@ function forward(this::uni_LSTM,x,h_prev,c_prev)
     o = 1.0 ./ (1.0 .+ exp.(-o))
 
     c_next = f .* c_prev + g .* i
+
     h_next = o .* tanh.(c_next)
 
-    this.cache .= [x, h_prev, c_prev, i, f, g, o, c_next]
+    this.cache = [x, h_prev, c_prev, i, f, g, o, c_next]
 
     return h_next, c_next
 end
@@ -82,21 +94,28 @@ function backward(this::uni_LSTM,dh_next,dc_next)
     dWx = x' * dA
     db = sum(dA,dims=1)
 
-    this.grads[1][:] .= dWx
-    this.grads[2][:] .= dWh
-    this.grads[3][:] .= db
+    this.grads[1] .= dWx
+    this.grads[2] .= dWh
+    this.grads[3] .= db
 
     dx = dA * Wx'
     dh_prev = dA * Wh'
 
     return dx, dh_prev, dc_prev
 end
-function add_uni_LSTM(in_neurons,out_neurons,option)
-    Wx = randn(in_neurons,4*out_neurons)/sqrt(in_neurons)
-    Wh = randn(out_neurons,4*out_neurons)/sqrt(out_neurons)
-    b = zeros(1,4*out_neurons)
-
-    return uni_LSTM(Wx,Wh,b)
+function add_uni_LSTM(pre_neuron,neurons,option)
+    layers = []
+    for neuron in neurons
+        Wx = randn(pre_neuron,4*neuron)/sqrt(pre_neuron)
+        Wh = randn(neuron,4*neuron)/sqrt(neuron)
+        b = zeros(1,4*neuron)
+        pre_neuron = neuron
+        append!(layers,[uni_LSTM(Wx,Wh,b)])
+    end
+    return layers
+end
+function reset(this::uni_LSTM)
+    return 0
 end
 
 #====LSTM===================#
@@ -107,18 +126,22 @@ mutable struct LSTM
     h #次のエポックに引き継ぐ
     c
     dh
-    stateful
-    LSTM(Wx,Wh,b,stateful) = new(
+    option
+    LSTM(Wx,Wh,b,option) = new(
         [Wx,Wh,b],
         [zeros(size(Wx)),zeros(size(Wh)),zeros(size(b))],
         nothing,
         nothing,
         nothing,
         nothing,
-        stateful
+        option
     )
 end
 function forward(this::LSTM,xs)
+    #sequenceに応じて出力を変える(hs{N,T,H},h{N,H})
+    #{N,1,H}のように3次元で固定する場合，他レイヤの仕様変更が必要
+
+    @unpack stateful, out_sequence, padding = this.option
     Wx,Wh,b = this.params
     #バッチサイズ，ブロック数，入力データ数
     N, T, D = size(xs)
@@ -127,11 +150,11 @@ function forward(this::LSTM,xs)
     this.layers = []
     hs = zeros(Float64,(N,T,H))
 
-    if !this.stateful || this.h === nothing
+    if !stateful || this.h === nothing
         this.h = zeros(Float64,(N,H))
     end
 
-    if !this.stateful || this.c === nothing
+    if !stateful || this.c === nothing
         this.c = zeros(Float64,(N,H))
     end
 
@@ -142,7 +165,7 @@ function forward(this::LSTM,xs)
         push!(this.layers,rnn_layer)
     end
 
-    return hs
+    return out_sequence ? hs : this.h #this.h{N,H}
 end
         #後で改善
 function backward(this::LSTM,dhs)
@@ -176,6 +199,9 @@ function backward(this::LSTM,dhs)
         this.grads[2][:] = grads[2][:]
         this.grads[3][:] = grads[3][:]
 
+        this.dh = dh
+        return dxs
+
     elseif ndims(dhs) == 3
         #many to many (dhs が (N,T,H))
         N, T, H = size(dhs)
@@ -193,21 +219,31 @@ function backward(this::LSTM,dhs)
                 this.grads[i] .+= rnn_layer.grads[i]
             end
         end
+        this.dh = dh
+        return dxs
+    end
+end
+function add_LSTM(pre_neuron,neurons,arg_option)
+    #最後のレイヤ以外はoptionにかかわらずシーケンス
+    layers = []
+    option = copy(arg_option)
+    option["out_sequence"] = true
+    for neuron in neurons
+        Wx = randn(pre_neuron,4*neuron)/sqrt(pre_neuron)
+        Wh = randn(neuron,4*neuron)/sqrt(neuron)
+        b = zeros(1,4*neuron)
+        pre_neuron = neuron
+        append!(layers,[LSTM(Wx,Wh,b,option)])
     end
 
-    this.dh = dh
+    layers[end].option = arg_option
 
-    return dxs
+    return layers
 end
-function add_LSTM(in_neurons,out_neurons,option)
-    Wx = randn(in_neurons,4*out_neurons)/sqrt(in_neurons)
-    Wh = randn(out_neurons,4*out_neurons)/sqrt(out_neurons)
-    b = zeros(1,4*out_neurons)
-    stateful = option["stateful"]
-
-    return LSTM(Wx,Wh,b)
+function reset(this::LSTM)
+    this.c = []
+    this.h = []
 end
-
 #====Sigmoid_with_loss=================#
 mutable struct Sigmoid_with_loss
     params
@@ -231,6 +267,9 @@ function backward(this::Sigmoid_with_loss,din)
 end
 function add_Sigmoid_with_loss()
     return Sigmoid_with_loss()
+end
+function reset(this::Sigmoid_with_loss)
+    this.t = []
 end
 
 end

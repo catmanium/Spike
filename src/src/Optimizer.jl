@@ -1,41 +1,33 @@
 module Optimizer
 
-#=====
-params
-======#
-abstract type Optimizer_params end
-mutable struct SGD_params <: Optimizer_params
-    learning_rate::Float64 
-end
-mutable struct Adam_params <: Optimizer_params
-    learning_rate::Float64
+#====Adam============#
+mutable struct Adam_struct
+    learning_rate
     p1
     p2
     e
     vs #momentam
     ss #RMSProp
 end
+function Adam(model,option=Dict())
+    #デフォルト値
+    learning_rate = haskey(option,"learning_rate") ? option["learning_rate"] : 0.001
+    p1 = haskey(option,"p1") ? option["p1"] : 0.95
+    p2 = haskey(option,"p2") ? option["p2"] : 0.99
+    e  = haskey(option,"e") ? option["e"] : 10^(-12)
 
-#=========
-コンストラクタ
-==========#
-function SGD(params::Array)
-    return SGD_params(params[1])    
-end
-function Adam(params::Array)
-    return Adam_params(params[1],params[2],params[3],params[4],params[5],params[6])
-end
-
-#=========
-実行
-==========#
-function update(this::SGD_params,model)
-    for i in 1:length(model.params)
-        # layers[i].W = layers[i].W -this.learning_rate*layers[i].dW
-        model.params[i] .-= this.learning_rate*model.grads[i]
+    vs = []
+    ss = []
+    for param in model.params
+        v = zeros(Float64,size(param))
+        s = zeros(Float64,size(param))
+        append!(vs,[v])
+        append!(ss,[s])
     end
+
+    model.optimizer = Adam_struct(learning_rate,p1,p2,e,vs,ss) 
 end
-function update(this::Adam_params,model) #layer->model
+function update(this::Adam_struct,model)
     for i in 1:length(model.params)
         v = this.p1 .* this.vs[i] .+ (1-this.p1).*model.grads[i]
         s = this.p2 .* this.ss[i] .+ (1-this.p2).*(model.grads[i] .^2)
