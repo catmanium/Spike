@@ -156,6 +156,11 @@ function forward(this::LSTM,xs)
 
     @unpack stateful, out_sequence, padding, GPU = this.option
     Wx,Wh,b = this.params
+    params = [Wx,Wh,b]
+    dWx = GPU ? CUDA.zeros(size(Wx)) : zeros(size(Wx))
+    dWh = GPU ? CUDA.zeros(size(Wh)) : zeros(size(Wh))
+    db = GPU ? CUDA.zeros(size(b)) : zeros(size(b))
+    grads = [dWx,dWh,db]
     #バッチサイズ，ブロック数，入力データ数
     N, T, D = size(xs)
     H = size(Wh,1)
@@ -172,7 +177,7 @@ function forward(this::LSTM,xs)
     end
 
     for t in 1:T
-        rnn_layer = uni_LSTM(Wx,Wh,b)
+        rnn_layer = uni_LSTM(params,grads)
         this.h, this.c = forward(rnn_layer,xs[:,t,:],this.h,this.c)
         hs[:,t,:] = this.h
         push!(this.layers,rnn_layer)
@@ -270,8 +275,8 @@ end
 mutable struct Sigmoid_with_loss
     params
     grads
-    s::Array #スコア
-    t::Array
+    s #スコア
+    t
     Sigmoid_with_loss() = new([],[],[],[])
 end
 function forward(this::Sigmoid_with_loss,in)
