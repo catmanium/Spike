@@ -1,5 +1,7 @@
 module Optimizer
 
+using CUDA
+
 #====Adam============#
 mutable struct Adam_struct
     learning_rate

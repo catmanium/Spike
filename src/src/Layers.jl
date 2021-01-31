@@ -1,6 +1,6 @@
 module Layers
 
-using UnPack
+using UnPack,CUDA
 #=================================
 ・params,gradsは共通で持たせる
 ・add_レイヤ：コンストラクタは配列で返す．
@@ -238,7 +238,7 @@ function backward(this::LSTM,dhs)
     end
 end
 function add_LSTM(pre_neuron,neurons,arg_option)
-    gpu = option["GPU"]
+    gpu = arg_option["GPU"]
     #最後のレイヤ以外はoptionにかかわらずシーケンス
     layers = []
     option = copy(arg_option)
