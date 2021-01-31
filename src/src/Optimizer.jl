@@ -10,6 +10,8 @@ mutable struct Adam_struct
     ss #RMSProp
 end
 function Adam(model,option=Dict())
+    gpu = model.option["GPU"]
+
     #デフォルト値
     learning_rate = haskey(option,"learning_rate") ? option["learning_rate"] : 0.001
     p1 = haskey(option,"p1") ? option["p1"] : 0.95
@@ -19,8 +21,8 @@ function Adam(model,option=Dict())
     vs = []
     ss = []
     for param in model.params
-        v = zeros(Float64,size(param))
-        s = zeros(Float64,size(param))
+        v = gpu ? CUDA.zeros(size(param)) : zeros(Float64,size(param))
+        s = gpu ? CUDA.zeros(size(param)) : zeros(Float64,size(param))
         append!(vs,[v])
         append!(ss,[s])
     end

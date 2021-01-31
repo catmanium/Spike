@@ -12,7 +12,7 @@ mutable struct Affine
     params #W,b
     grads #dW,db
     in
-    Affine(W,b) = new([W,b],[zeros(Float64,size(W)),zeros(Float64,size(b))],[])
+    Affine(params,grads) = new(params,grads,[])
 end
 function forward(this::Affine,in)
     this.in = in
@@ -24,12 +24,17 @@ function backward(this::Affine,din)
     return din * (this.params[1])'
 end
 function add_Affine(pre_neuron,neurons,option)
+    gpu = option["GPU"]
     layers = []
     for neuron in neurons
-        W = randn(pre_neuron,neuron)
-        b = zeros(1,neuron)
+        W = gpu ? CUDA.randn(pre_neuron,neuron) : randn(pre_neuron,neuron)
+        b = gpu ? CUDA.zeros(1,neuron) : zeros(1,neuron)
+        params = [W,b]
+        dW = gpu ? CUDA.zeros(size(W)) : zeros(Float64,size(W))
+        db = gpu ? CUDA.zeros(size(b)) : zeros(size(b))
+        grads = [dW,db]
         pre_neuron = neuron
-        append!(layers,[Affine(W,b)])
+        append!(layers,[Affine(params,grads)])
     end
     return layers
 end
@@ -42,7 +47,7 @@ mutable struct uni_LSTM
     params #Wx,Wh,b
     grads #dWx,dWh,db
     cache #x, h_prev, h_next,i,f,g,o,c_next
-    uni_LSTM(Wx,Wh,b) = new([Wx,Wh,b],[zeros(size(Wx)),zeros(size(Wh)),zeros(size(b))],[])
+    uni_LSTM(params,grads) = new(params,grads,[])
 end
 function forward(this::uni_LSTM,x,h_prev,c_prev)
     Wx, Wh, b = this.params
@@ -104,13 +109,21 @@ function backward(this::uni_LSTM,dh_next,dc_next)
     return dx, dh_prev, dc_prev
 end
 function add_uni_LSTM(pre_neuron,neurons,option)
+    gpu = option["GPU"]
     layers = []
     for neuron in neurons
-        Wx = randn(pre_neuron,4*neuron)/sqrt(pre_neuron)
-        Wh = randn(neuron,4*neuron)/sqrt(neuron)
-        b = zeros(1,4*neuron)
+        Wx = gpu ? CUDA.randn(pre_neuron,4*neuron)/sqrt(pre_neuron) : randn(pre_neuron,4*neuron)/sqrt(pre_neuron)
+        Wh = gpu ? CUDA.randn(neuron,4*neuron)/sqrt(neuron) : randn(neuron,4*neuron)/sqrt(neuron)
+        b = gpu ? CUDA.zeros(1,4*neuron) : zeros(1,4*neuron)
+        params = [Wx,Wh,b]
+
+        dWx = gpu ? CUDA.zeros(size(Wx)) : zeros(size(Wx))
+        dWh = gpu ? CUDA.zeros(size(Wh)) : zeros(size(Wh))
+        db = gpu ? CUDA.zeros(size(b)) : zeros(size(b))
+        grads = [dWx,dWh,db]
+
         pre_neuron = neuron
-        append!(layers,[uni_LSTM(Wx,Wh,b)])
+        append!(layers,[uni_LSTM(params,grads)])
     end
     return layers
 end
@@ -127,9 +140,9 @@ mutable struct LSTM
     c
     dh
     option
-    LSTM(Wx,Wh,b,option) = new(
-        [Wx,Wh,b],
-        [zeros(size(Wx)),zeros(size(Wh)),zeros(size(b))],
+    LSTM(params,grads,option) = new(
+        params,
+        grads,
         nothing,
         nothing,
         nothing,
@@ -141,21 +154,21 @@ function forward(this::LSTM,xs)
     #sequenceに応じて出力を変える(hs{N,T,H},h{N,H})
     #{N,1,H}のように3次元で固定する場合，他レイヤの仕様変更が必要
 
-    @unpack stateful, out_sequence, padding = this.option
+    @unpack stateful, out_sequence, padding, GPU = this.option
     Wx,Wh,b = this.params
     #バッチサイズ，ブロック数，入力データ数
     N, T, D = size(xs)
     H = size(Wh,1)
 
     this.layers = []
-    hs = zeros(Float64,(N,T,H))
+    hs = GPU ? CUDA.zeros((N,T,H)) : zeros(Float64,(N,T,H))
 
     if !stateful || this.h === nothing
-        this.h = zeros(Float64,(N,H))
+        this.h = GPU ? CUDA.zeros((N,H)) : zeros(Float64,(N,H))
     end
 
     if !stateful || this.c === nothing
-        this.c = zeros(Float64,(N,H))
+        this.c = GPU ? CUDA.zeros((N,H)) : zeros(Float64,(N,H))
     end
 
     for t in 1:T
@@ -169,6 +182,7 @@ function forward(this::LSTM,xs)
 end
         #後で改善
 function backward(this::LSTM,dhs)
+    gpu = this.option["GPU"]
     Wx, Wh, b = this.params
     D, H = size(Wx)
     
@@ -177,13 +191,13 @@ function backward(this::LSTM,dhs)
         #many to one (dhs が (N,H))
         N, H = size(dhs)
         T = length(this.layers)
-        dxs = zeros(Float64,(N,T,D))
+        dxs = gpu ? CUDA.zeros((N,T,D)) : zeros(Float64,(N,T,D))
         #代入する勾配
         grads = copy(this.grads)
         grads -= grads #全て0に
         
         dh = copy(dhs)
-        dc = zeros(Float64,size(dh))
+        dc = gpu ? CUDA.zeros(size(dh)) : zeros(Float64,size(dh))
         
         for t in T:-1:1
             rnn_layer = this.layers[t]
@@ -205,10 +219,10 @@ function backward(this::LSTM,dhs)
     elseif ndims(dhs) == 3
         #many to many (dhs が (N,T,H))
         N, T, H = size(dhs)
-        dxs = zeros(Float64,(N,T,D))
+        dxs = gpu ? CUDA.zeros((N,T,D)) : zeros(Float64,(N,T,D))
 
-        dh = zeros(Float64,size(dhs[:,1,:]))
-        dc = zeros(Float64,size(dhs[:,1,:]))
+        dh = gpu ? CUDA.zeros(size(dhs[:,1,:])) : zeros(Float64,size(dhs[:,1,:]))
+        dc = gpu ? CUDA.zeros(size(dhs[:,1,:])) : zeros(Float64,size(dhs[:,1,:]))
         for t in T:-1:1
             rnn_layer = this.layers[t]
             dx, dh, dc = backward(rnn_layer,dhs[:,t,:]+dh, dc)
@@ -224,16 +238,24 @@ function backward(this::LSTM,dhs)
     end
 end
 function add_LSTM(pre_neuron,neurons,arg_option)
+    gpu = option["GPU"]
     #最後のレイヤ以外はoptionにかかわらずシーケンス
     layers = []
     option = copy(arg_option)
     option["out_sequence"] = true
     for neuron in neurons
-        Wx = randn(pre_neuron,4*neuron)/sqrt(pre_neuron)
-        Wh = randn(neuron,4*neuron)/sqrt(neuron)
-        b = zeros(1,4*neuron)
+        Wx = gpu ? CUDA.randn(pre_neuron,4*neuron)/sqrt(pre_neuron) : randn(pre_neuron,4*neuron)/sqrt(pre_neuron)
+        Wh = gpu ? CUDA.randn(neuron,4*neuron)/sqrt(neuron) : randn(neuron,4*neuron)/sqrt(neuron)
+        b = gpu ? CUDA.zeros(1,4*neuron) : zeros(1,4*neuron)
+        params = [Wx,Wh,b]
+
+        dWx = gpu ? CUDA.zeros(size(Wx)) : zeros(size(Wx))
+        dWh = gpu ? CUDA.zeros(size(Wh)) : zeros(size(Wh))
+        db = gpu ? CUDA.zeros(size(b)) : zeros(size(b))
+        grads = [dWx,dWh,db]
+
         pre_neuron = neuron
-        append!(layers,[LSTM(Wx,Wh,b,option)])
+        append!(layers,[LSTM(params,grads,option)])
     end
 
     layers[end].option = arg_option
@@ -241,8 +263,8 @@ function add_LSTM(pre_neuron,neurons,arg_option)
     return layers
 end
 function reset(this::LSTM)
-    this.c = []
-    this.h = []
+    this.c = nothing
+    this.h = nothing
 end
 #====Sigmoid_with_loss=================#
 mutable struct Sigmoid_with_loss

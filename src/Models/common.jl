@@ -27,15 +27,6 @@ function format_model(model,layer_and_neurons,loss_layer,option)
     func_loss_layer = string("Layers.add_$(loss_layer)()")
     push!(model.layers,eval(Meta.parse(func_loss_layer)))
 
-    if option["GPU"]
-        model.params = cu.(model.params)
-        model.grads = cu.(model.grads)
-        for i in 1:length(model.layers)
-            model.layers[i].params = cu.(model.layers[i].params)
-            model.layers[i].grads = cu.(model.layers[i].grads)
-        end
-    end
-
     return true
 end
 
@@ -61,6 +52,11 @@ function backward(model)
 end
 
 function learn(model::Sequence;max_epoch,window_size,data,t_data)
+    if model.option["GPU"]
+        data = cu(data)
+        t_data = cu(t_data)
+    end
+
     D = size(data,3) #データ次元数
     T = window_size #RNNレイヤ数
     N = size(data,1) #バッチ数
