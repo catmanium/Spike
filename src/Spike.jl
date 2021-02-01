@@ -5,10 +5,7 @@ module Spike
     include("Models/MLP.jl")
     include("Models/LSTM.jl")
 
-
-    
-
-    # export MLP,LSTM
+    include("dataset/noise_sin.jl")
 
 
 end

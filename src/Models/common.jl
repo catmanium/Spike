@@ -51,10 +51,12 @@ function backward(model)
     end
 end
 
-function learn(model::Sequence;max_epoch,window_size,data,t_data)
+function learn(model::Sequence;max_epoch,window_size,data,t_data,v_data,v_t_data)
     if model.option["GPU"]
         data = cu(data)
         t_data = cu(t_data)
+        v_data = cu(v_data)
+        v_t_data = cu(v_t_data)
     end
 
     D = size(data,3) #データ次元数
@@ -62,6 +64,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data)
     N = size(data,1) #バッチ数
     max_ite = size(data,2)÷T #イテレーション数
     loss_list = [] #avg_lossのリスト
+    v_loss_list = [] #検証用の損失リスト
     
     for epoch in 1:max_epoch
         ite_total_loss = 0 #損失合計
@@ -81,11 +84,11 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data)
             ite_total_loss += sum(loss)/length(loss)
             #逆伝播
             backward(model)
-            #勾配クリッピング
-            # append!(grads_list,this.grads[1][1])
             #更新
             Optimizer.update(model.optimizer,model)
         end
+        #検証
+        append!(v_loss_list,verification(model;data=v_data,t_data=v_t_data,window_size=window_size))
 
         avg_loss = ite_total_loss/max_ite
         append!(loss_list,avg_loss)
@@ -97,6 +100,33 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data)
 
     reset(model)
 
-    return loss_list
+    return loss_list,v_loss_list
 end
 
+function verification(model;data,t_data,window_size)
+    D = size(data,3) #データ次元数
+    T = window_size #RNNレイヤ数
+    N = size(data,1) #バッチ数
+    max_ite = size(data,2)÷T #イテレーション数
+    loss_list = [] #avg_lossのリスト
+
+    ite_total_loss = 0 #損失合計
+    avg_loss = 0 #1エポックの平均損失
+    st = 0 #data切り取り位置
+    ed = 0
+
+    for ite in 1:max_ite
+        #ミニバッチ作成
+        st = Int(1+(ite-1)*T)
+        ed = Int(T*ite)
+        xs = data[:,st:ed,:]
+        t = t_data[:,ite,:]
+        #順伝播
+        model.layers[end].t = t #教師データ挿入
+        loss = predict(model,xs)
+        #ite毎の平均損失を加算
+        ite_total_loss += sum(loss)/length(loss)
+    end
+
+    return ite_total_loss/max_ite
+end
