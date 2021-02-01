@@ -6,6 +6,7 @@ module Spike
     include("Models/LSTM.jl")
 
     include("dataset/noise_sin.jl")
+    include("dataset/shaping_data.jl")
 
 
 end
