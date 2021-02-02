@@ -271,6 +271,7 @@ function reset(this::LSTM)
     this.c = nothing
     this.h = nothing
 end
+
 #====Sigmoid_with_loss=================#
 mutable struct Sigmoid_with_loss
     params
@@ -297,6 +298,32 @@ function add_Sigmoid_with_loss()
 end
 function reset(this::Sigmoid_with_loss)
     this.t = []
+end
+
+#====MSE==============================#
+mutable struct Mean_Squared_Error
+    params
+    grads
+    s
+    t
+    Mean_Squared_Error() = new([],[],[],[])
+end
+function forward(this::Mean_Squared_Error,in)
+    this.s = in
+    if length(this.t)==0
+        return this.s
+    end
+
+    return sum.(((this.t-in).^2))/length(this.t)
+end
+function backward(this::Mean_Squared_Error,din)
+    return (this.s - this.t).*(2/length(this.t))
+end
+function add_Mean_Squared_Error()
+    return Mean_Squared_Error()
+end
+function reset(this::Mean_Squared_Error)
+    return 0
 end
 
 end
