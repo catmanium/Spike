@@ -26,6 +26,7 @@ function shaping_rnn(data,N)
 
     return re_data
 end
+
 function get_rate_of_change(array)
     rate_arr = zeros(length(array)-1)
     for i in 1:length(array)-1
@@ -35,4 +36,20 @@ function get_rate_of_change(array)
     #行列化
     rate_arr = reshape(rate_arr,(length(rate_arr),1))
     return rate_arr
+end
+
+function standardization(data,disp=false)
+    avg = sum(data)/length(data)
+    variance = sum((data.-avg).^2)/length(data)
+    std = sqrt(variance)
+
+    data_norm = (data.-avg)/std
+
+    if disp
+        println("avg : $avg")
+        println("variance : $variance")
+        println("standard deviation : $std")
+    end
+
+    return data_norm
 end
