@@ -1,5 +1,9 @@
 module Spike
-    using CUDA,UnPack
+    using Pkg
+    Pkg.resolve()
+
+    using CUDA,UnPack,CSV,DataFrames,JSON,PyCall
+
     #全てのモデルファイルをincludeする ※後日
 
     include("Models/MLP.jl")

@@ -38,18 +38,23 @@ function get_rate_of_change(array)
     return rate_arr
 end
 
-function standardization(data,disp=false)
+function standardization(data)
     avg = sum(data)/length(data)
     variance = sum((data.-avg).^2)/length(data)
     std = sqrt(variance)
 
     data_norm = (data.-avg)/std
 
-    if disp
-        println("avg : $avg")
-        println("variance : $variance")
-        println("standard deviation : $std")
-    end
+    re = Dict(
+        "avg" => avg,
+        "variance" => variance,
+        "std" => std,
+        "data" => data_norm
+    )
 
-    return data_norm
+    return re
+end
+
+function decode_standardization(data,avg,std)
+    return data .* std .+ avg
 end
