@@ -43,18 +43,34 @@ function standardization(data)
     variance = sum((data.-avg).^2)/length(data)
     std = sqrt(variance)
 
-    data_norm = (data.-avg)/std
+    std_data = (data.-avg)/std
 
     re = Dict(
         "avg" => avg,
         "variance" => variance,
         "std" => std,
-        "data" => data_norm
+        "data" => std_data
     )
 
     return re
 end
-
 function decode_standardization(data,avg,std)
     return data .* std .+ avg
+end
+
+function normalization(data)
+    max = findmax(data)[1]
+    min = findmin(data)[1]
+    norm_data = (data.-min)./(max-min)
+
+    re = Dict(
+        "max" => max,
+        "min" => min,
+        "data" => norm_data
+    )
+
+    return re
+end
+function decode_normalization(data,max,min)
+    return data .* (max-min) .+ min
 end
