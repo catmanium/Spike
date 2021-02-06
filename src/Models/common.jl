@@ -88,7 +88,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,v_data,v_t_data
             Optimizer.update(model.optimizer,model)
         end
         #検証
-        append!(v_loss_list,verification(model;data=v_data,t_data=v_t_data,window_size=window_size))
+        # append!(v_loss_list,verification(model;data=v_data,t_data=v_t_data,window_size=window_size))
 
         avg_loss = ite_total_loss/max_ite
         append!(loss_list,avg_loss)
