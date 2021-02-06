@@ -29,11 +29,11 @@ end
 
 function make_sequential_batch(data,T)
     #T = window * 任意の数 + 1
-    N = length(data) ÷ T 
+    N = size(data,1) ÷ T 
     D = size(data,2)
-    ed = length(data) % T #はみ出したデータは削る
+    ed = size(data,1) % T #はみ出したデータは削る
 
-    re_data = reshape(data[1:end-ed],(T,N,D))
+    re_data = reshape(data[1:end-ed,:],(T,N,D))
     return permutedims(re_data,(2,1,3))  #軸の入れ替え
 end
 
