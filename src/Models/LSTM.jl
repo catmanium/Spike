@@ -5,6 +5,8 @@ mutable struct LSTM_struct <: Sequence
     grads
     layers
     optimizer
+    std_params #avg,vari,std
+    norm_params #max,min
     option
     LSTM_struct(option) = new([],[],[],nothing,option)
 end

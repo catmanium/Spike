@@ -48,39 +48,34 @@ function get_rate_of_change(array)
     return rate_arr
 end
 
-function standardization(data)
+function standardization(model,data)
     avg = sum(data)/length(data)
     variance = sum((data.-avg).^2)/length(data)
     std = sqrt(variance)
 
     std_data = (data.-avg)/std
 
-    re = Dict(
-        "avg" => avg,
-        "variance" => variance,
-        "std" => std,
-        "data" => std_data
-    )
+    model.std_params = [avg,variance,std]
 
-    return re
+    return std_data
 end
-function decode_standardization(data,avg,std)
+function decode_standardization(model,data)
+    avg,variance,std = model.std_params
+
     return data .* std .+ avg
 end
 
-function normalization(data)
+function normalization(model,data)
     max = findmax(data)[1]
     min = findmin(data)[1]
     norm_data = (data.-min)./(max-min)
 
-    re = Dict(
-        "max" => max,
-        "min" => min,
-        "data" => norm_data
-    )
+    model.norm_params = [max,min]
 
-    return re
+    return norm_data
 end
-function decode_normalization(data,max,min)
+function decode_normalization(model,data)
+    max,min = model.norm_params
+
     return data .* (max-min) .+ min
 end
