@@ -145,7 +145,9 @@ end
 
 function model_load(model,path)
     d = load("$path")
-    model.params .= model.option["GPU"] ? cu.(d["model"]["params"]) : d["model"]["params"]
+    for i in 1:length(model.params)
+        model.params[i] .= cu(d["model"]["params"][i])
+    end
     model.std_params = d["model"]["std_params"]
     model.norm_params = d["model"]["norm_params"]
 end
