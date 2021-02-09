@@ -5,10 +5,10 @@ mutable struct LSTM_struct <: Sequence
     grads
     layers
     optimizer
-    std_params #avg,vari,std
-    norm_params #max,min
+    std_params #Dict("name"=>[avg,variance,std])
+    norm_params #Dict("name"=>[max,min])
     option
-    LSTM_struct(option) = new([],[],[],nothing,option)
+    LSTM_struct(option) = new([],[],[],nothing,Dict(),Dict(),option)
 end
 
 function LSTM(;layer_and_neurons=[],loss_layer=nothing,optimizer="Adam",option=Dict())

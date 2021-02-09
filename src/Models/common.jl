@@ -130,3 +130,13 @@ function verification(model;data,t_data,window_size)
 
     return ite_total_loss/max_ite
 end
+
+function model_save(model,path="")
+    save("$path","model",model)
+end
+
+function model_load(path)
+    l_model = load("$path")
+    
+    return l_model["model"]
+end

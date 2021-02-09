@@ -2,9 +2,6 @@
 データ整形
 =================#
 function shaping_rnn(data,N)
-    #re_data (N, X/N, D)
-    #ite毎に切り出して使用する
-    #Tは2軸目のサイズに応じて後から決める
 
     X,D = size(data,1),size(data,2)
     re_data = []
@@ -48,34 +45,44 @@ function get_rate_of_change(array)
     return rate_arr
 end
 
-function standardization(model,data)
+function standardization(model,data,name)
     avg = sum(data)/length(data)
     variance = sum((data.-avg).^2)/length(data)
     std = sqrt(variance)
 
     std_data = (data.-avg)/std
 
-    model.std_params = [avg,variance,std]
+    model.std_params[name] = [avg,variance,std]
 
     return std_data
 end
-function decode_standardization(model,data)
-    avg,variance,std = model.std_params
+function re_standardization(model,data,name)
+    avg,variance,std = model.std_params[name]
+
+    return (data.-avg)/std
+end
+function decode_standardization(model,data,name)
+    avg,variance,std = model.std_params[name]
 
     return data .* std .+ avg
 end
 
-function normalization(model,data)
+function normalization(model,data,name)
     max = findmax(data)[1]
     min = findmin(data)[1]
     norm_data = (data.-min)./(max-min)
 
-    model.norm_params = [max,min]
+    model.norm_params[name] = [max,min]
 
     return norm_data
 end
-function decode_normalization(model,data)
-    max,min = model.norm_params
+function re_normalization(modal,data,name)
+    max,min = model.norm_params[name]
+
+    return (data.-min)./(max-min)
+end
+function decode_normalization(model,data,name)
+    max,min = model.norm_params[name]
 
     return data .* (max-min) .+ min
 end
