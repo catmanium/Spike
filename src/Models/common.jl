@@ -132,11 +132,20 @@ function verification(model;data,t_data,window_size)
 end
 
 function model_save(model,path="")
-    save("$path","model",model)
+    #paramsとnorm,stdのみ
+    d = Dict(
+    "params" => Array.(model.params),
+    "std_params" => model.std_params,
+    "norm_params" => model.norm_params
+    )
+    
+    save("$path","model",d)
+
 end
 
-function model_load(path)
-    l_model = load("$path")
-    
-    return l_model["model"]
+function model_load(model,path)
+    d = load("$path")
+    model.params = model.option["GPU"] ? cu.(d["model"]["params"]) : d["model"]["params"]
+    model.std_params = d["model"]["std_params"]
+    model.norm_params = d["model"]["norm_params"]
 end
