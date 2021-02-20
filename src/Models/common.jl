@@ -144,9 +144,10 @@ function model_save(model,path="")
 end
 
 function model_load(model,path)
+    gpu = model.option["GPU"]
     d = load("$path")
     for i in 1:length(model.params)
-        model.params[i] .= cu(d["model"]["params"][i])
+        model.params[i] .= gpu ? cu(d["model"]["params"][i]) : d["model"]["params"][i]
     end
     model.std_params = d["model"]["std_params"]
     model.norm_params = d["model"]["norm_params"]
