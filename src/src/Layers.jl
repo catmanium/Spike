@@ -338,11 +338,12 @@ function forward(this::Mean_Squared_Error,in)
     if length(this.t)==0
         return this.s
     end
-
-    return sum.(((this.t-in).^2))/length(this.t)
+    
+    return sum(((this.t-in).^2),dims=2)./size(this.t,2)
+    # return sum.(((this.t-in).^2))/length(this.t)
 end
 function backward(this::Mean_Squared_Error,din)
-    return (this.s - this.t).*(2/length(this.t))
+    return (this.s - this.t).*(2/size(this.t,2))
 end
 function add_Mean_Squared_Error()
     return Mean_Squared_Error()
