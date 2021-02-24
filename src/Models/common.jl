@@ -5,7 +5,7 @@ abstract type Sequence end
 abstract type not_Sequence end
 
 function format_model(model,layer_and_neurons,loss_layer,option)
-    pre_neuron = layer_and_neurons["input"]
+    pre_neuron = layer_and_neurons[1][2] #input
     for l_n in layer_and_neurons
         if l_n[1] == "input" continue end
         layer_name = l_n[1]

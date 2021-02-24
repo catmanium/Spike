@@ -287,8 +287,13 @@ end
 function backward(this::Sigmoid,din)
     return (1.0 .- this.s) .* this.s
 end
-function add_Sigmoid()
-    return Sigmoid()
+function add_Sigmoid(pre_neuron,neurons,arg_option)
+    layers = []
+    for neuron in neurons
+        pre_neuron = neuron
+        append!(layers,[Sigmoid()])
+    end
+    return layers
 end
 function reset(this::Sigmoid)
 end
