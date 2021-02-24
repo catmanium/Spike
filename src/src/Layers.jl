@@ -285,7 +285,7 @@ function forward(this::Sigmoid,in)
     return s
 end
 function backward(this::Sigmoid,din)
-    return (1.-this.s).* this.s
+    return (1.0 .- this.s) .* this.s
 end
 function add_Sigmoid()
     return Sigmoid()
