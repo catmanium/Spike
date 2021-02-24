@@ -77,9 +77,12 @@ function normalization(model,data,name)
 
     max = findmax(data)[1]
     min = findmin(data)[1]
-    norm_data = (data.-min)./(max-min)
-
+    
     model.norm_params[name] = [max,min]
+
+    if max == min return zeros(size(data)) end
+
+    norm_data = (data.-min)./(max-min)
 
     return norm_data
 end

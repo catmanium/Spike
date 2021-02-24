@@ -51,12 +51,10 @@ function backward(model)
     end
 end
 
-function learn(model::Sequence;max_epoch,window_size,data,t_data,v_data,v_t_data)
+function learn(model::Sequence;max_epoch,window_size,data,t_data)
     if model.option["GPU"]
         data = cu(data)
         t_data = cu(t_data)
-        v_data = cu(v_data)
-        v_t_data = cu(v_t_data)
     end
 
     D = size(data,3) #データ次元数
@@ -64,7 +62,12 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,v_data,v_t_data
     N = size(data,1) #バッチ数
     max_ite = size(data,2)÷T #イテレーション数
     loss_list = [] #avg_lossのリスト
-    v_loss_list = [] #検証用の損失リスト
+    min_avg_loss = 0 #最小損失
+    p = Progress(max_epoch*max_ite,1,"Learning...")
+
+    println("Learning.....")
+    println("now loss : : ep.1/$(max_epoch)")
+    println("min loss : : ep.0")
     
     for epoch in 1:max_epoch
         ite_total_loss = 0 #損失合計
@@ -86,49 +89,45 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,v_data,v_t_data
             backward(model)
             #更新
             Optimizer.update(model.optimizer,model)
+
+            next!(p)
         end
-        #検証
-        # append!(v_loss_list,verification(model;data=v_data,t_data=v_t_data,window_size=window_size))
 
         avg_loss = ite_total_loss/max_ite
         append!(loss_list,avg_loss)
-       
-        if epoch == 1 || epoch%(max_epoch÷10) == 0
-            println("ep.$epoch : Loss :　",avg_loss)
+
+        #出力
+        if epoch == max_epoch print("\e[1A") end #上へ
+        print("\e[2A") #上へ
+        print("\e[2K") #行クリア
+        print("\e[0G") #先頭へ
+        color = length(loss_list)==1||(avg_loss > loss_list[end-1]) ? "\e[31m" : "\e[34m"
+        print("now loss : ")
+        print("$(color)","$(avg_loss)","\e[0m")
+        print(" : ep.$(epoch)/$(max_epoch)")
+        print("\e[2E") #下へ
+
+        #min_avg_loss，その時のep,今のep,avg_loss
+        if min_avg_loss > avg_loss || epoch==1
+            min_avg_loss = avg_loss
+            print("\e[1A") #上へ
+            print("\e[2K") #行クリア
+            print("\e[0G") #先頭へ
+            print("min loss : $(min_avg_loss) : ep.$(epoch)")
+            print("\e[1E") #下へ
         end
+       
+        # if epoch == 1 || epoch%(max_epoch÷10) == 0
+        #     println("ep.$epoch : Loss :　",avg_loss)
+        # end
     end
+
+    print("\e[1E") #下へ
+    println("done!")
 
     reset(model)
 
-    return loss_list,v_loss_list
-end
-
-function verification(model;data,t_data,window_size)
-    D = size(data,3) #データ次元数
-    T = window_size #RNNレイヤ数
-    N = size(data,1) #バッチ数
-    max_ite = size(data,2)÷T #イテレーション数
-    loss_list = [] #avg_lossのリスト
-
-    ite_total_loss = 0 #損失合計
-    avg_loss = 0 #1エポックの平均損失
-    st = 0 #data切り取り位置
-    ed = 0
-
-    for ite in 1:max_ite
-        #ミニバッチ作成
-        st = Int(1+(ite-1)*T)
-        ed = Int(T*ite)
-        xs = data[:,st:ed,:]
-        t = t_data[:,ite,:]
-        #順伝播
-        model.layers[end].t = t #教師データ挿入
-        loss = predict(model,xs)
-        #ite毎の平均損失を加算
-        ite_total_loss += sum(loss)/length(loss)
-    end
-
-    return ite_total_loss/max_ite
+    return loss_list
 end
 
 function model_save(model,path="")

@@ -2,7 +2,7 @@ module Spike
     using Pkg
     Pkg.resolve()
 
-    using CUDA,UnPack,CSV,DataFrames,JSON,PyCall,JLD2,FileIO
+    using CUDA,UnPack,CSV,DataFrames,JSON,PyCall,JLD2,FileIO,ProgressMeter
 
     #全てのモデルファイルをincludeする ※後日
 
