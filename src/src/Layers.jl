@@ -272,6 +272,26 @@ function reset(this::LSTM)
     this.h = nothing
 end
 
+#====Sigmoid===========================#
+mutable struct Sigmoid
+    params
+    grads
+    s
+    Sigmoid() = new([],[],[])
+end
+function forward(this::Sigmoid,in)
+    s = 1.0 ./ (1.0 .+ exp.(-in))
+    this.s = s
+    return s
+end
+function backward(this::Sigmoid,din)
+    return (1.-this.s).* this.s
+end
+function add_Sigmoid()
+    return Sigmoid()
+end
+function reset(this::Sigmoid)
+end
 #====Sigmoid_with_loss=================#
 mutable struct Sigmoid_with_loss
     params
