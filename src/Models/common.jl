@@ -63,6 +63,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,notebook=nothin
     max_ite = size(data,2)÷T #イテレーション数
     loss_list = [] #avg_lossのリスト
     min_avg_loss = 0 #最小損失
+    min_epoch = 0
     p = Progress(max_epoch*max_ite,1,"Progress : ")
 
     println("Learning.....")
@@ -107,15 +108,16 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,notebook=nothin
         # print(" : ep.$(epoch)/$(max_epoch)")
         # print("\e[2E") #下へ
 
-        #min_avg_loss，その時のep,今のep,avg_loss
-        # if min_avg_loss > avg_loss || epoch==1
-        #     min_avg_loss = avg_loss
-        #     print("\e[1A") #上へ
-        #     print("\e[2K") #行クリア
-        #     print("\e[0G") #先頭へ
-        #     print("min loss : $(min_avg_loss) : ep.$(epoch)")
-        #     print("\e[1E") #下へ
-        # end
+        # min_avg_loss，その時のep,今のep,avg_loss
+        if min_avg_loss > avg_loss || epoch==1
+            min_avg_loss = avg_loss
+            min_epoch = epoch
+            # print("\e[1A") #上へ
+            # print("\e[2K") #行クリア
+            # print("\e[0G") #先頭へ
+            # print("min loss : $(min_avg_loss) : ep.$(epoch)")
+            # print("\e[1E") #下へ
+        end
        
     end
 
@@ -124,7 +126,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,notebook=nothin
 
     reset(model)
 
-    return loss_list
+    return loss_list,(min_avg_loss,min_epoch)
 end
 
 function model_save(model,path="")
