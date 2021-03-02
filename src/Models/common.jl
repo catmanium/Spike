@@ -37,10 +37,16 @@ function reset(model)
 end
 
 function predict(model,data)
+    if model.option["GPU"]
+        data = cu(data)
+    end
+
     out = data
+
     for layer in model.layers
         out = Layers.forward(layer,out)
     end
+
     return out
 end
 
@@ -51,7 +57,7 @@ function backward(model)
     end
 end
 
-function learn(model::Sequence;max_epoch,window_size,data,t_data,notebook=nothing)
+function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=nothing,verification_param=nothing)
     if model.option["GPU"]
         data = cu(data)
         t_data = cu(t_data)
@@ -64,11 +70,10 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,notebook=nothin
     loss_list = [] #avg_lossのリスト
     min_avg_loss = 0 #最小損失
     min_epoch = 0
+    out_verification = []
     p = Progress(max_epoch*max_ite,1,"Progress : ")
 
     println("Learning.....")
-    # println("now loss : : ep.1/$(max_epoch)")
-    # println("min loss : : ep.0")
     
     for epoch in 1:max_epoch
         ite_total_loss = 0 #損失合計
@@ -94,39 +99,27 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,notebook=nothin
             next!(p)
         end
 
+        #検証
+        if verification!=nothing
+            out_verification = verification(model,verification_param)
+        end
+
         avg_loss = ite_total_loss/max_ite
         append!(loss_list,avg_loss)
-
-        #出力
-        # if epoch == max_epoch print("\e[1A") end #上へ
-        # print("\e[2A") #上へ
-        # print("\e[2K") #行クリア
-        # print("\e[0G") #先頭へ
-        # color = length(loss_list)==1||(avg_loss > loss_list[end-1]) ? "\e[31m" : "\e[34m"
-        # print("now loss : ")
-        # print("$(color)","$(avg_loss)","\e[0m")
-        # print(" : ep.$(epoch)/$(max_epoch)")
-        # print("\e[2E") #下へ
 
         # min_avg_loss，その時のep,今のep,avg_loss
         if min_avg_loss > avg_loss || epoch==1
             min_avg_loss = avg_loss
             min_epoch = epoch
-            # print("\e[1A") #上へ
-            # print("\e[2K") #行クリア
-            # print("\e[0G") #先頭へ
-            # print("min loss : $(min_avg_loss) : ep.$(epoch)")
-            # print("\e[1E") #下へ
         end
        
+        reset(model)
+
     end
 
-    # print("\e[1E") #下へ
     println("done!")
 
-    reset(model)
-
-    return loss_list,(min_avg_loss,min_epoch)
+    return loss_list,[min_avg_loss,min_epoch],out_verification
 end
 
 function model_save(model,path="")
