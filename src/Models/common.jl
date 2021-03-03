@@ -57,7 +57,16 @@ function backward(model)
     end
 end
 
-function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=nothing,verification_param=nothing)
+
+#===============================================
+verification(model,struct)の形にする
+    保存したい値はstructへ
+    返り値は学習終了の判断に使うbool
+
+    表示を追加する場合は，モデルにIOBuffer()を追加
+    そこにverification()内で文字列を追加
+================================================#
+function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=nothing,verification_params=nothing)
     if model.option["GPU"]
         data = cu(data)
         t_data = cu(t_data)
@@ -70,7 +79,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
     loss_list = [] #avg_lossのリスト
     min_avg_loss = 0 #最小損失
     min_epoch = 0
-    out_verification = []
+    continue_flg = true
     p = Progress(max_epoch*max_ite,1,"Progress : ")
 
     println("Learning.....")
@@ -99,11 +108,14 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
             next!(p)
         end
 
+        reset(model)
+
         #検証
         if verification!=nothing
-            out_verification = verification(model,verification_param)
+            continue_flg = verification(model,verification_params)
+            reset(model)
         end
-
+        
         avg_loss = ite_total_loss/max_ite
         append!(loss_list,avg_loss)
 
@@ -113,13 +125,12 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
             min_epoch = epoch
         end
        
-        reset(model)
 
     end
 
     println("done!")
 
-    return loss_list,[min_avg_loss,min_epoch],out_verification
+    return loss_list
 end
 
 function model_save(model,path="")
