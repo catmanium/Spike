@@ -113,7 +113,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
         avg_loss = ite_total_loss/max_ite
         append!(loss_list,avg_loss)
 
-        print(model.learn_io,"epoch: $(epoch) | loss: $(avg_loss) | ")
+        print(model.learn_io,"\e[0F","\e[2K","epoch: $(epoch) | loss: $(avg_loss) | ")
         model.learn_plot = plot(loss_list,xlims=(0,max_epoch),ylims=(0,1),label="cross_entropy_loss");
 
         #検証
