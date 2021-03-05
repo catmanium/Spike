@@ -8,7 +8,9 @@ mutable struct LSTM_struct <: Sequence
     std_params #Dict("name"=>[avg,variance,std])
     norm_params #Dict("name"=>[max,min])
     option
-    LSTM_struct(option) = new([],[],[],nothing,Dict(),Dict(),option)
+    learn_io
+    learn_plot
+    LSTM_struct(option) = new([],[],[],nothing,Dict(),Dict(),option,IOBuffer(),nothing)
 end
 
 function LSTM(;layer_and_neurons=[],loss_layer=nothing,optimizer="Adam",option=Dict())

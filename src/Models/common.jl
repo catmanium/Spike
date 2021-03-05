@@ -66,7 +66,7 @@ verification(model,struct)の形にする
     表示を追加する場合は，モデルにIOBuffer()を追加
     そこにverification()内で文字列を追加
 ================================================#
-function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=nothing,verification_params=nothing)
+function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=nothing,verification_params=nothing,notebook=false)
     if model.option["GPU"]
         data = cu(data)
         t_data = cu(t_data)
@@ -82,7 +82,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
     continue_flg = true
     p = Progress(max_epoch*max_ite,1,"Progress : ")
 
-    println("Learning.....")
+    println("epoch: 0 | loss: 0 | ")
     
     for epoch in 1:max_epoch
         ite_total_loss = 0 #損失合計
@@ -110,14 +110,25 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
 
         reset(model)
 
+        avg_loss = ite_total_loss/max_ite
+        append!(loss_list,avg_loss)
+
+        print(model.learn_io,"epoch: $(epoch) | loss: $(avg_loss) | ")
+        model.learn_plot = plot(loss_list,xlims=(0,max_epoch),ylims=(0,1),label="cross_entropy_loss");
+
         #検証
         if verification!=nothing
             continue_flg = verification(model,verification_params)
             reset(model)
         end
-        
-        avg_loss = ite_total_loss/max_ite
-        append!(loss_list,avg_loss)
+
+        if notebook 
+            IJulia.clear_output(true)
+            plot(model.learn_plot) |> display
+        else
+            print("\e[2K","\e[1F","\e[2K")
+        end
+        take!(model.learn_io) |> String |> println
 
         # min_avg_loss，その時のep,今のep,avg_loss
         if min_avg_loss > avg_loss || epoch==1
@@ -127,8 +138,6 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
        
 
     end
-
-    println("done!")
 
     return loss_list
 end
@@ -153,4 +162,9 @@ function model_load(model,path)
     end
     model.std_params = d["model"]["std_params"]
     model.norm_params = d["model"]["norm_params"]
+end
+
+function disp(model,notebook)
+
+    
 end
