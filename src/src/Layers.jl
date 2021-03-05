@@ -307,12 +307,13 @@ mutable struct Sigmoid_with_loss
 end
 function forward(this::Sigmoid_with_loss,in)
     s = 1.0 ./ (1.0 .+ exp.(-in))
+    delta = 1e-7
     this.s = s
     if length(this.t) == 0
         #ただの推論
         return s
     end
-    l = -this.t .* log.(s) - (1 .-this.t) .* log.(1 .-s)
+    l = -this.t .* log.(delta.+s) - (1 .-this.t) .* log.(1 .-s)
     return l
 end
 function backward(this::Sigmoid_with_loss,din)
