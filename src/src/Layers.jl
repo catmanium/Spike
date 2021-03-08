@@ -313,7 +313,7 @@ function forward(this::Sigmoid_with_loss,in)
         #ただの推論
         return s
     end
-    l = -this.t .* log.(delta.+s) - (1 .-this.t) .* log.(1 .-s)
+    l = -this.t .* log.(delta.+s) - (1 .-this.t) .* log.(1+delta .-s)
     return l
 end
 function backward(this::Sigmoid_with_loss,din)
