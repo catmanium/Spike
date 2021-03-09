@@ -76,7 +76,6 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
     T = window_size #RNNレイヤ数
     N = size(data,1) #バッチ数
     max_ite = size(data,2)÷T #イテレーション数
-    loss_list = [] #avg_lossのリスト
     min_avg_loss = 0 #最小損失
     min_epoch = 0
     continue_flg = true
@@ -111,10 +110,9 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
         reset(model)
 
         avg_loss = ite_total_loss/max_ite
-        append!(loss_list,avg_loss)
+        append!(model.loss,avg_loss)
 
-        print(model.learn_io,"\e[0F","\e[2K","epoch: $(epoch) | loss: $(avg_loss) | ")
-        model.learn_plot = plot(loss_list,xlims=(0,max_epoch),ylims=(0,1),label="cross_entropy_loss");
+        print(model.learn_io,"\n","\e[0F","\e[2K","epoch: $(epoch) | loss: $(avg_loss) | ")
 
         #検証
         if verification!=nothing
