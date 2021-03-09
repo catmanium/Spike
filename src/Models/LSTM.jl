@@ -11,7 +11,8 @@ mutable struct LSTM_struct <: Sequence
     option
     learn_io
     learn_plot
-    LSTM_struct(option) = new([],[],[],nothing,Dict(),Dict(),[],option,IOBuffer(),nothing)
+    epoch
+    LSTM_struct(option) = new([],[],[],nothing,Dict(),Dict(),[],option,IOBuffer(),nothing,0)
 end
 
 function LSTM(;layer_and_neurons=[],loss_layer=nothing,optimizer="Adam",option=Dict())

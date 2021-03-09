@@ -80,6 +80,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
     min_epoch = 0
     continue_flg = true
     p = Progress(max_epoch*max_ite,1,"Progress : ")
+    model.epoch = max_epoch
 
     println("epoch: 0 | loss: 0 | ")
     
