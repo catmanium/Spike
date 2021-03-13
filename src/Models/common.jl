@@ -80,7 +80,10 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
     min_epoch = 0
     continue_flg = true
     p = Progress(max_epoch*max_ite,1,"Progress : ")
-    model.epoch = max_epoch
+
+    model.max_epoch = max_epoch
+    model.loss = zeros(max_epoch)
+    model.window_size = window_size
 
     println("epoch: 0 | loss: 0 | ")
     
@@ -89,6 +92,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
         avg_loss = 0 #1エポックの平均損失
         st = 0 #data切り取り位置
         ed = 0
+        model.epoch = epoch
         for ite in 1:max_ite
             #ミニバッチ作成
             st = Int(1+(ite-1)*T)
@@ -111,7 +115,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
         reset(model)
 
         avg_loss = ite_total_loss/max_ite
-        append!(model.loss,avg_loss)
+        model.loss[epoch] = avg_loss
 
         print(model.learn_io,"\n","\e[0F","\e[2K","epoch: $(epoch) | loss: $(avg_loss) | ")
 
@@ -138,7 +142,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
 
     end
 
-    return loss_list
+    return 0
 end
 
 function model_save(model,path="")
