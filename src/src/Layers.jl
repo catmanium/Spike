@@ -135,7 +135,7 @@ end
 mutable struct LSTM
     params #Wx,Wh,b
     grads #dWx,dWh,db
-    layers #複数のRNNレイヤを管理
+    layers #複数のLSTMレイヤを管理
     h #次のエポックに引き継ぐ
     c
     dh

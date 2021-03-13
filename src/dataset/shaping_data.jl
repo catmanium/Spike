@@ -24,13 +24,15 @@ function shaping_rnn(data,N)
     return re_data
 end
 
-function make_sequential_batch(data,T)
+function make_sequential_batch(data,N,window_size)
     #T = window * 任意の数 + 1
-    N = size(data,1) ÷ T 
+    T_a = size(data,1) ÷ N
+    n = (T_a - 1) ÷ window_size
+    T = window_size * n + 1
     D = size(data,2)
-    ed = size(data,1) % T #はみ出したデータは削る
+    ed = N * T #はみ出したデータは削る
 
-    re_data = reshape(data[1:end-ed,:],(T,N,D))
+    re_data = reshape(data[1:ed,:],(T,N,D))
     return permutedims(re_data,(2,1,3))  #軸の入れ替え
 end
 
