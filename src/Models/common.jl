@@ -43,7 +43,7 @@ function predict(model,data)
 
     out = data
 
-    for layer in model.layers
+    @inbounds for layer in model.layers
         out = Layers.forward(layer,out)
     end
 
@@ -52,7 +52,7 @@ end
 
 function backward(model)
     dout = 0
-    for layer in reverse(model.layers)
+    @inbounds for layer in reverse(model.layers)
         dout = Layers.backward(layer,dout)
     end
 end
@@ -87,17 +87,17 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
 
     println("epoch: 0 | loss: 0 | ")
     
-    for epoch in 1:max_epoch
+    @inbounds for epoch in 1:max_epoch
         ite_total_loss = 0 #損失合計
         avg_loss = 0 #1エポックの平均損失
         st = 0 #data切り取り位置
         ed = 0
         model.epoch = epoch
-        for ite in 1:max_ite
+        @inbounds for ite in 1:max_ite
             #ミニバッチ作成
             st = Int(1+(ite-1)*T)
             ed = Int(T*ite)
-            xs = data[:,st:ed,:]
+            xs = view(data,:,st:ed,:)
             t = t_data[:,ite,:]
             #順伝播
             model.layers[end].t = t #教師データ挿入
@@ -117,7 +117,11 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
         avg_loss = ite_total_loss/max_ite
         model.loss[epoch] = avg_loss
 
-        print(model.learn_io,"\n","\e[0F","\e[2K","epoch: $(epoch) | loss: $(avg_loss) | ")
+        if notebook 
+            print(model.learn_io,"\n","\e[0F","\e[2K","epoch: ",epoch," | loss: ",avg_loss," | ")
+        else
+            print(model.learn_io,"\e[1F","\e[2K","epoch: ",epoch," | loss: ",avg_loss," | ")
+        end
 
         #検証
         if verification!=nothing
@@ -129,7 +133,7 @@ function learn(model::Sequence;max_epoch,window_size,data,t_data,verification=no
             IJulia.clear_output(true)
             plot(model.learn_plot) |> display
         else
-            print("\e[2K","\e[1F","\e[2K")
+            print("\e[1E")
         end
         take!(model.learn_io) |> String |> println
 
