@@ -1,3 +1,5 @@
+export shaping_rnn,make_sequential_batch,get_rate_of_change,standardization!,decode_standardization!,normalization!,decode_normalization
+
 #================
 データ整形
 =================#
