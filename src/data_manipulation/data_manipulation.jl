@@ -47,9 +47,9 @@ function get_rate_of_change(array)
     return rate_arr
 end
 
-function standardization(model,data,name)
-    if haskey(model.std_params,name)
-        avg,variance,std = model.std_params[name]
+function standardization!(model::Models,data,name)
+    if haskey(model.common.std_params,name)
+        avg,variance,std = model.common.std_params[name]
 
         return (data.-avg)/std
     end
@@ -60,19 +60,19 @@ function standardization(model,data,name)
 
     std_data = (data.-avg)/std
 
-    model.std_params[name] = [avg,variance,std]
+    model.common.std_params[name] = [avg,variance,std]
 
     return std_data
 end
-function decode_standardization(model,data,name)
-    avg,variance,std = model.std_params[name]
+function decode_standardization(model::Models,data,name)
+    avg,variance,std = model.common.std_params[name]
 
     return data .* std .+ avg
 end
 
-function normalization(model,data,name)
-    if haskey(model.norm_params,name)
-        max,min = model.norm_params[name]
+function normalization!(model::Models,data,name)
+    if haskey(model.common.norm_params,name)
+        max,min = model.common.norm_params[name]
 
         return (data.-min)./(max-min)
     end
@@ -80,7 +80,7 @@ function normalization(model,data,name)
     max = findmax(data)[1]
     min = findmin(data)[1]
     
-    model.norm_params[name] = [max,min]
+    model.common.norm_params[name] = [max,min]
 
     if max == min return zeros(size(data)) end
 
@@ -88,8 +88,8 @@ function normalization(model,data,name)
 
     return norm_data
 end
-function decode_normalization(model,data,name)
-    max,min = model.norm_params[name]
+function decode_normalization(model::Models,data,name)
+    max,min = model.common.norm_params[name]
 
     return data .* (max-min) .+ min
 end

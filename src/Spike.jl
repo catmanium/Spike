@@ -1,16 +1,29 @@
 module Spike
-    using Pkg
-    Pkg.resolve()
 
-    using CUDA,UnPack,CSV,DataFrames,JSON,PyCall,JLD2,FileIO,ProgressMeter,Plots,IJulia
+using Pkg
+Pkg.resolve()
 
-    #全てのモデルファイルをincludeする ※後日
+#===
+共通パッケージ
+===#
 
-    include("Models/MLP.jl")
-    include("Models/LSTM.jl")
+using CUDA,UnPack,CSV,DataFrames,JSON,JLD2,FileIO,ProgressMeter,Plots,IJulia,LinearAlgebra
 
-    include("dataset/noise_sin.jl")
-    include("dataset/shaping_data.jl")
+#===
+全ファイル共通
+===#
+abstract type Models end
+abstract type Layers end
+abstract type Optimizer end
+
+#===
+各種ファイルの読み込み
+===#
+
+include("models/models.jl")
+include("layers/layers.jl")
+include("optimizer/optimizer.jl")
+include("data_manipulation/data_manipulation.jl")
 
 
 end
