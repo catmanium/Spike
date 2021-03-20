@@ -120,8 +120,7 @@ function backward!(this::uni_LSTM,dh_next,dc_next)
 
     dA = hcat(df,dg,di,d_o)
 
-    this.grads[1] = this.x' * dA
-    # mul!(this.grads[1],copy(this.x'),dA) copyが入る為遅い
+    mul!(this.grads[1],copy(this.x'),dA)
     mul!(this.grads[2],this.h_prev',dA)
     this.grads[3] .= sum(dA,dims=1)
 
