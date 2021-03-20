@@ -1,4 +1,10 @@
 #===
+・サブ配列の転置をmul!に渡す時は，copy()
+
+===#
+
+
+#===
 ファイルの読み込み
 ===#
 # include("seqential.jl")
@@ -19,8 +25,8 @@ mutable struct Affine <: Layers
     function Affine(input,output)
         W = randn((input,output))
         b = zeros((1,output))
-        dW = similar(W)
-        db = similar(b)
+        dW = zeros(size(W))
+        db = zeros(size(b))
         in = zeros(output,input)
         new([W,b],[dW,db],in,nothing)
     end
@@ -114,7 +120,8 @@ function backward!(this::uni_LSTM,dh_next,dc_next)
 
     dA = hcat(df,dg,di,d_o)
 
-    mul!(this.grads[1],this.x',dA)
+    this.grads[1] = this.x' * dA
+    # mul!(this.grads[1],copy(this.x'),dA) copyが入る為遅い
     mul!(this.grads[2],this.h_prev',dA)
     this.grads[3] .= sum(dA,dims=1)
 

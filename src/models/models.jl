@@ -60,7 +60,8 @@ end
 function add_layer!(model::Models,layers)
     if model.common.gpu_flg
         @inbounds @simd for i in 1:length(layers)
-            layers[i].params = cu(layers[i].params)
+            layers[i].params = cu.(layers[i].params)
+            layers[i].grads = cu.(layers[i].grads)
         end
     end
     model.common.layers = layers
