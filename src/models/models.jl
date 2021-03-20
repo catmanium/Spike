@@ -1,4 +1,4 @@
-export predict!,backward!,add_layer!,add_optimizer!,get_layers,get_params,get_loss,get_now_epoch,save_model,load_model
+export predict!,backward!,add_layer!,add_optimizer!,get_layers,get_params,get_loss,get_now_epoch,save_model,load_model,reset!
 #===
 共通型，関数
 ・全てのモデルはModelCommonをcommonに持ち，Modelsの子型になる

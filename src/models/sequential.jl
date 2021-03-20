@@ -7,7 +7,7 @@ mutable struct Sequential <: Models
     Sequential(gpu_flg=false)=new(ModelCommon(gpu_flg),0)
 end
 
-function learn!(model::Models,data,t_data,window_size,max_epoch,verification_params=nothing,verification=nothing,notebook=false)
+function learn!(model::Models;data,t_data,window_size,max_epoch,verification_params=nothing,verification=nothing,notebook=false)
     D = size(data,3) #データ次元数
     T = window_size #内部ユニット数
     N = size(data,1) #バッチ数
@@ -48,26 +48,26 @@ function learn!(model::Models,data,t_data,window_size,max_epoch,verification_par
         avg_loss = ite_total_loss/max_ite
         model.common.loss[epoch] = avg_loss
 
-        # if notebook 
-        #     print(model.learn_io,"\n","\e[0F","\e[2K","epoch: ",epoch," | loss: ",avg_loss," | ")
-        # else
-        #     print(model.learn_io,"\e[1F","\e[2K","epoch: ",epoch," | loss: ",avg_loss," | ")
-        # end
+        if notebook 
+            print(model.common.learn_io,"\n","\e[0F","\e[2K","epoch: ",epoch," | loss: ",avg_loss," | ")
+        else
+            print(model.common.learn_io,"\e[1F","\e[2K","epoch: ",epoch," | loss: ",avg_loss," | ")
+        end
 
         #検証
-        # if verification!=nothing
-        #     continue_flg = verification(model,verification_params)
-        #     reset(model)
-        # end
+        if verification!=nothing
+            continue_flg = verification(model,verification_params)
+            reset!(model)
+        end
 
-        # if notebook 
-        #     IJulia.clear_output(true)
-        #     plot(model.learn_plot) |> display
-        # else
-        #     print("\e[1E")
-        # end
+        if notebook 
+            IJulia.clear_output(true)
+            plot(model.common.learn_plot) |> display
+        else
+            print("\e[1E")
+        end
 
-        # take!(model.learn_io) |> String |> println
+        take!(model.common.learn_io) |> String |> println
 
         # min_avg_loss，その時のep,今のep,avg_loss
         if model.common.min_loss > avg_loss || epoch==1
