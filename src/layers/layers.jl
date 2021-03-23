@@ -1,6 +1,6 @@
 #===
-・サブ配列の転置をmul!に渡す時は，copy()
-
+・サブ配列の転置は，相手側を転置して，積を再転置する方が早い
+・similar()は，計算に用いらない場合に使う（値の置換など）
 ===#
 
 
@@ -21,27 +21,26 @@ mutable struct Affine <: Layers
     params #W,b
     grads #dW,db
     in
-    tmp
+    gpu_flg
     function Affine(input,output)
         W = randn((input,output))
         b = zeros((1,output))
         dW = zeros(size(W))
         db = zeros(size(b))
         in = zeros(output,input)
-        new([W,b],[dW,db],in,nothing)
+        new([W,b],[dW,db],in,false)
     end
 end
 function forward!(this::Affine,in)
     W,b = this.params
     this.in = in
-    (this.tmp===nothing) && (this.tmp=similar(W,size(in,1),size(W,2)))
-    mul!(this.tmp,in,W)
-    this.tmp .+ b
+    in * W .+ b
 end
 function backward!(this::Affine,din)
-    mul!(this.grads[1],(this.in)',din)
+    # mul!(this.grads[1],(this.in)',din)
+    this.grads[1] = (din' * this.in)'    
     this.grads[2] = sum(din,dims=1)
-    mul!(similar(din,size(din,1),size(this.params[1],1)),din,(this.params[1])')
+    din * this.params[1]'
 end
 function reset!(this::Affine)
     nothing
@@ -60,39 +59,33 @@ mutable struct uni_LSTM <: Layers
     g
     o
     c_next
-    x_tmp
-    h_tmp
-    dx
-    dh_prev
+    gpu_flg
     function uni_LSTM(params,grads)
-        new(params,grads,nothing,nothing,nothing,nothing,nothing,nothing,nothing,nothing,nothing,nothing,nothing,nothing)
+        new(params,grads,nothing,nothing,nothing,nothing,nothing,nothing,nothing,nothing,false)
     end
 end
 function forward!(this::uni_LSTM,x,h_prev,c_prev)
-    Wx, Wh, b = this.params
-    N, H = size(h_prev)
+    #x{N,D}, h_prev{N,H}, c_prev{N,H}
+    Wx, Wh, b = this.params #{D*4H,H*4H,1*4H}
+    N = size(x,1)
+    H = size(h_prev,2)
 
-    if this.x_tmp === nothing
-        this.x_tmp = similar(x,size(x,1),size(Wx,2))
-        this.h_tmp = similar(h_prev,size(h_prev,1),size(Wh,2))
-    end
+    #N,4H
+    A = x * Wx + h_prev * Wh .+ b
 
-    mul!(this.x_tmp,x,Wx)
-    mul!(this.h_tmp,h_prev,Wh)
-    A = this.x_tmp + this.h_tmp .+ b
-
+    #それぞれ{N,H}
     f = 1.0 ./ (1.0 .+ exp.(-(view(A,:,1:H)))) #Sigmoid
     g = tanh.(view(A,:,H+1:2*H))
     i = 1.0 ./ (1.0 .+ exp.(-(view(A,:,2*H+1:3*H))))
     o = 1.0 ./ (1.0 .+ exp.(-(view(A,:,3*H+1:size(A,2)))))
 
-    c_next = f .* c_prev + g .* i
+    c_next = f .* c_prev + g .* i #N,H
 
-    h_next = o .* tanh.(c_next)
+    h_next = o .* tanh.(c_next) #N,H
 
     this.x = x
-    this.h_prev = h_prev
-    this.c_prev = c_prev
+    this.h_prev = h_prev #N,H
+    this.c_prev = c_prev #N,H
     this.i = i
     this.f = f
     this.g = g
@@ -120,19 +113,19 @@ function backward!(this::uni_LSTM,dh_next,dc_next)
 
     dA = hcat(df,dg,di,d_o)
 
-    mul!(this.grads[1],copy(this.x'),dA)
-    mul!(this.grads[2],this.h_prev',dA)
+    # mul!(this.grads[1],copy(this.x'),dA)
+    this.grads[1] = (dA' * this.x)'
+    this.grads[2] = this.h_prev' * dA
+    # mul!(this.grads[2],this.h_prev',dA)
+
     this.grads[3] .= sum(dA,dims=1)
 
-    if this.dx === nothing
-        this.dx = similar(dA,size(dA,1),size(Wx,1))
-        this.dh_prev = similar(dA,size(dA,1),size(Wh,1))
-    end
+    # mul!(this.dx,dA,Wx')
+    # mul!(this.dh_prev,dA,Wh')
+    dx = dA * Wx'
+    dh_prev = dA * Wh'
 
-    mul!(this.dx,dA,Wx')
-    mul!(this.dh_prev,dA,Wh')
-
-    return this.dx, this.dh_prev, dc_prev
+    return dx, dh_prev, dc_prev
 end
 function reset!(this::uni_LSTM)
     nothing
@@ -150,6 +143,7 @@ mutable struct LSTM
     stateful
     out_sequence
     dxs
+    gpu_flg
     function LSTM(input,output;stateful=true,out_sequence=true)
         Wx = randn(input,4*output)/sqrt(input)
         Wh = randn(output,4*output)/sqrt(output)
@@ -167,27 +161,29 @@ mutable struct LSTM
             nothing,
             stateful,
             out_sequence,
-            nothing
+            nothing,
+            false
         )
     end
 end
 function forward!(this::LSTM,xs)
     stateful = this.stateful
+    gpu_flg = this.gpu_flg
     #バッチサイズ，ブロック数，入力データ数
     N, T, D = size(xs)
-    H = size(this.params[2],1)
+    H = size(this.params[2],1) #Wh{H,4H}
 
     hs = similar(xs,N,T,H)
 
     if !stateful || this.h === nothing
-        this.h = map(x->0.0,similar(xs,(N,H))) * 0
+        this.h = gpu_flg ? CUDA.zeros(N,H) : zeros(N,H)
     end
     if !stateful || this.c === nothing
-        this.c = map(x->0.0,similar(xs,(N,H))) * 0
+        this.c = gpu_flg ? CUDA.zeros(N,H) : zeros(N,H)
     end
 
     #uni_LSTMの初期化
-    uni_layer = uni_LSTM(this.params,copy(this.grads).*0)
+    uni_layer = uni_LSTM(this.params,this.grads.*0)
     this.layers = fill(uni_layer,T)
 
     @inbounds @simd for t in 1:T
@@ -198,26 +194,23 @@ function forward!(this::LSTM,xs)
     return this.out_sequence ? hs : this.h #this.h{N,H}
 end
 function backward!(this::LSTM,dhs)
-    #dhs{N,H}
     Wx, Wh, b = this.params
-    D, H = size(Wx) #Hは4倍になってる
-    N = size(dhs,1)
+    D = size(Wx,1) #{D,4H}
+    N = size(dhs,1) #dhs{N,H} || {N,T,H}
     T = length(this.layers)
     this.dxs = similar(dhs,(N,T,D))
     this.grads *= 0 #勾配初期化
-
-    dc = map(x->0.0,similar(dhs,N,Int(H/4)))
         
     if this.out_sequence
-        backward_dims_3!(this,dhs,dc,T)
+        backward_dims_3!(this,dhs,T) #dhs{N,T,H}
     else
-        #out_sequence = false => dh{N,H}
-        backward_dims_2!(this,dhs,dc,T)
+        backward_dims_2!(this,dhs,T) #dhs{N,H}
     end
 
     return this.dxs
 end
-function backward_dims_2!(this::LSTM,dh,dc,T)
+function backward_dims_2!(this::LSTM,dh,T)
+    dc = this.gpu_flg ? CUDA.zeros(size(dh)) : zeros(size(dh))
     @inbounds @simd for t in T:-1:1
         uni_layer = this.layers[t]
         this.dxs[:,t,:], dh, dc = backward!(uni_layer,dh,dc)
@@ -228,8 +221,9 @@ function backward_dims_2!(this::LSTM,dh,dc,T)
     this.dh = dh
     nothing
 end
-function backward_dims_3!(this::LSTM,dhs,dc,T)
-    this.dh = copy(dc)
+function backward_dims_3!(this::LSTM,dhs,T)
+    this.dh = this.gpu_flg ? CUDA.zeros(size(dhs[:,1,:])) : zeros(size(dhs[:,1,:]))
+    dc = this.gpu_flg ? CUDA.zeros(size(dhs[:,1,:])) : zeros(size(dhs[:,1,:]))
     @inbounds @simd for t in T:-1:1
         uni_layer = this.layers[t]
         this.dxs[:,t,:], this.dh, dc = backward!(uni_layer,view(dhs,:,t,:)+this.dh, dc)
@@ -251,7 +245,8 @@ mutable struct Sigmoid_with_loss
     grads
     s #スコア
     t
-    Sigmoid_with_loss() = new([],[],nothing,nothing)
+    gpu_flg
+    Sigmoid_with_loss() = new([],[],nothing,nothing,false)
 end
 function forward!(this::Sigmoid_with_loss,in)
     s = 1.0 ./ (1.0 .+ exp.(-in))

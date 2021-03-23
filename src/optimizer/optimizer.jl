@@ -28,7 +28,9 @@ function fit!(this::Adam,model::Models)
     @inbounds for i in 1:length(model.common.layers)
         for j in 1:length(model.common.layers[i].params)
             params = model.common.layers[i].params[j]
-            (length(params)==0) && continue
+            if length(params)==0
+                continue
+            end
             s = copy(params) * 0
             append!(this.vs,[s])
             append!(this.ss,[s])
@@ -42,7 +44,9 @@ function update!(this::Adam,model::Models)
     @inbounds for i in 1:length(model.common.layers)
         for j in 1:length(model.common.layers[i].grads)
             grads = model.common.layers[i].grads[j]
-            (length(grads)==0) && continue
+            if length(grads)==0
+                continue
+            end
             v = this.p1 .* this.vs[cnt] .+ (1-this.p1).*grads
             s = this.p2 .* this.ss[cnt] .+ (1-this.p2).*(grads .^2)
             model.common.layers[i].params[j] .-= this.learning_rate*(v./sqrt.(this.e .+s))
