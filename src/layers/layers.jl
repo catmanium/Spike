@@ -50,7 +50,7 @@ end
 function convert_to_cu!(this::Affine)
     this.params = cu.(this.params)
     this.grads = cu.(this.grads)
-    this.gpu = true
+    this.gpu_flg = true
     nothing
 end
 function convert_to_array!(this::Affine)
@@ -263,7 +263,7 @@ end
 function convert_to_cu!(this::LSTM)
     this.params = cu.(this.params)
     this.grads = cu.(this.grads)
-    this.gpu = true
+    this.gpu_flg = true
     this.layers = nothing
     this.dxs = nothing
     this.dh = nothing
@@ -323,7 +323,7 @@ end
 function convert_to_cu!(this::Sigmoid_with_loss)
     this.params = cu.(this.params)
     this.grads = cu.(this.grads)
-    this.gpu = true
+    this.gpu_flg = true
     nothing
 end
 function convert_to_array!(this::Sigmoid_with_loss)
@@ -365,7 +365,7 @@ end
 function convert_to_cu!(this::Dropout)
     this.params = cu.(this.params)
     this.grads = cu.(this.grads)
-    this.gpu = true
+    this.gpu_flg = true
     if this.mask !== nothing
         this.mask = cu(this.mask)
     end
