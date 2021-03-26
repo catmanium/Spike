@@ -40,11 +40,11 @@ end
 dataは全て{N,D}の形でここに渡す.
 cuは引数の前にしておく
 =========#
-function predict!(model::Models,data)
+function predict!(model::Models,data,learn_flg=false)
     out = data
 
     @inbounds @simd for layer in model.common.layers
-        out = forward!(layer,out)
+        out = forward!(layer,out,learn_flg)
     end
 
     return out
@@ -59,10 +59,8 @@ end
 
 function add_layer!(model::Models,layers)
     if model.common.gpu_flg
-        @inbounds @simd for i in 1:length(layers)
-            layers[i].params = cu.(layers[i].params)
-            layers[i].grads = cu.(layers[i].grads)
-            layers[i].gpu_flg = true
+        @inbounds for i in 1:length(layers)
+            convert_to_cu!(layers[1])
         end
     end
     model.common.layers = layers
@@ -103,12 +101,22 @@ function get_params(model::Models,n=nothing)
 end
 
 function save_model(model::Models,path)
+    #パラメータ全てをArrayに直す必要がある
+    @inbounds for i in 1:length(model.common.layers)
+        convert_to_array!(model.common.layers[i])
+    end
     save(path,"model",Dict("content"=>model))
     nothing
 end
-function load_model(path)
+function load_model(path,gpu_flg=false)
     d = load(path)
-    return d["model"]["content"]
+    model = d["model"]["content"]
+    if gpu_flg
+        @inbounds for i in 1:length(model.common.layers)
+            convert_to_cu!(model.common.layers[i])
+        end
+    end
+    return model
 end
 #===
 ファイルの読み込み

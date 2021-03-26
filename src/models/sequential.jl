@@ -32,7 +32,7 @@ function learn!(model::Models;data,t_data,window_size,max_epoch,verification_par
             t = view(t_data,:,ite,:)
             #順伝播
             model.common.layers[end].t = t #教師データ挿入
-            loss = predict!(model,xs)
+            loss = predict!(model,xs,true)
             #ite毎の平均損失を加算
             ite_total_loss += sum(loss)/length(loss)
             #逆伝播
