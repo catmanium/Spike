@@ -60,7 +60,7 @@ end
 function add_layer!(model::Models,layers)
     if model.common.gpu_flg
         @inbounds for i in 1:length(layers)
-            convert_to_cu!(layers[1])
+            convert_to_cu!(layers[i])
         end
     end
     model.common.layers = layers
