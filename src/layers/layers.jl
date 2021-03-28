@@ -344,20 +344,36 @@ mutable struct Dropout
     ratio
     gpu_flg
     function Dropout(ratio)
-        new([],[],nothing,0,false)
+        new([],[],nothing,ratio,false)
     end
 end
 function forward!(this::Dropout,x,learn_flg)
-    this.mask = this.gpu_flg ? CUDA.rand(size(x,1),size(x,2)) : rand(size(x,1),size(x,2))
-    this.mask = map(x->(x.>this.ratio ? 1 : 0),this.mask)
+    s = size(x)
+    this.mask = rand(s[1],s[end])
+    this.mask = map(x->(x.>this.ratio ? 1.0 : 0.0),this.mask)
+    if this.gpu_flg
+        this.mask = cu(this.mask)
+    end
     if learn_flg
-        return x .* this.mask #学習
+        if length(s) == 3
+            for i in 1:s[2]
+                view(x,:,i,:) .*= this.mask
+            end
+            return x
+        end
+        return x .*= this.mask #学習
     else
-        return  x * (1.0 - this.ratio) #推論
+        return  x *= (1.0 - this.ratio) #推論
     end
 end
 function backward!(this::Dropout,dx)
-    dx .* this.mask
+    if length(size(dx)) == 3
+        for i in 1:size(dx,2)
+            view(dx,:,i,:) .*= this.mask
+        end
+        return dx
+    end
+    return dx .*= this.mask
 end
 function reset!(this::Dropout)
     nothing
