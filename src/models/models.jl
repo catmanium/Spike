@@ -1,4 +1,4 @@
-export predict!,backward!,add_layer!,add_optimizer!,get_layers,get_params,get_loss,get_now_epoch,save_model,load_model,reset!
+export predict!,backward!,add_layer!,add_optimizer!,get_layers,get_params,get_loss,get_now_epoch,save_model,load_model,reset!,convert_to_array,convert_to_cu
 #===
 共通型，関数
 ・全てのモデルはModelCommonをcommonに持ち，Modelsの子型になる
@@ -77,6 +77,17 @@ function reset!(model::Models)
     end
 end
 
+function convert_to_cu!(model::Models)
+    @inbounds for i in 1:length(model.common.layers)
+        convert_to_cu!(model.common.layers[i])
+    end
+end
+function convert_to_array!(model::Models)
+    @inbounds for i in 1:length(model.common.layers)
+        convert_to_array!(model.common.layers[i])
+    end
+end
+
 function get_layers(model::Models,n=nothing)
     (n===nothing) ? model.common.layers : model.common.layers[n]
 end
@@ -102,19 +113,21 @@ end
 
 function save_model(model::Models,path)
     #パラメータ全てをArrayに直す必要がある
-    @inbounds for i in 1:length(model.common.layers)
-        convert_to_array!(model.common.layers[i])
+    if model.common.gpu_flg
+        convert_to_array!(model)
     end
     save(path,"model",Dict("content"=>model))
+    #GPUへ復元
+    if model.common.gpu_flg
+        convert_to_cu!(model)
+    end
     nothing
 end
 function load_model(path,gpu_flg=false)
     d = load(path)
     model = d["model"]["content"]
     if gpu_flg
-        @inbounds for i in 1:length(model.common.layers)
-            convert_to_cu!(model.common.layers[i])
-        end
+        convert_to_cu!(model)
     end
     return model
 end
