@@ -50,12 +50,14 @@ end
 function convert_to_cu!(this::Affine)
     this.params = cu.(this.params)
     this.grads = cu.(this.grads)
+    this.in = nothing
     this.gpu_flg = true
     nothing
 end
 function convert_to_array!(this::Affine)
     this.params = Array.(this.params)
     this.grads = Array.(this.grads)
+    this.in = nothing
     this.gpu_flg = false
     nothing
 end
@@ -88,10 +90,10 @@ function forward!(this::uni_LSTM,x,h_prev,c_prev)
     A = x * Wx + h_prev * Wh .+ b
 
     #それぞれ{N,H}
-    f = 1.0 ./ (1.0 .+ exp.(-(view(A,:,1:H)))) #Sigmoid
+    f = 1 ./ (1 .+ exp.(-(view(A,:,1:H)))) #Sigmoid
     g = tanh.(view(A,:,H+1:2*H))
-    i = 1.0 ./ (1.0 .+ exp.(-(view(A,:,2*H+1:3*H))))
-    o = 1.0 ./ (1.0 .+ exp.(-(view(A,:,3*H+1:size(A,2)))))
+    i = 1 ./ (1 .+ exp.(-(view(A,:,2*H+1:3*H))))
+    o = 1 ./ (1 .+ exp.(-(view(A,:,3*H+1:size(A,2)))))
 
     c_next = f .* c_prev + g .* i #N,H
 
@@ -149,6 +151,7 @@ end
 #====LSTM===================#
 #===
 Dropoutを引数に渡すと，時系列方向にも適応できる(p.265)
+
 ===#
 mutable struct LSTM
     params #Wx,Wh,b
@@ -156,7 +159,6 @@ mutable struct LSTM
     layers #複数のLSTMレイヤを管理
     h #次のエポックに引き継ぐ
     c
-    dh
     stateful
     out_sequence
     dxs
@@ -173,7 +175,6 @@ mutable struct LSTM
         new(
             [Wx,Wh,b],
             [dWx,dWh,db],
-            nothing,
             nothing,
             nothing,
             nothing,
@@ -207,14 +208,15 @@ function forward!(this::LSTM,xs,learn_flg)
 
     @inbounds for t in 1:T
         this.h, this.c = forward!(this.layers[t],view(xs,:,t,:),this.h,this.c)
-        if this.dropout !== nothing && t != T #最後のレイヤは何もしない
+        hs[:,t,:] = this.h #次レイヤへの伝播用
+        if this.dropout !== nothing
+            #dropoutをかけるのはuni_LSTMに渡す値のみ(次レイヤへは別のdropoutを使う)
             this.h = forward!(this.dropout,this.h,learn_flg)
             this.c = forward!(this.dropout,this.c,learn_flg)
         end
-        hs[:,t,:] = this.h
     end
 
-    return this.out_sequence ? hs : this.h #this.h{N,H}
+    return this.out_sequence ? hs : hs[:,end,:] #hs{N,T,H}
 end
 function backward!(this::LSTM,dhs)
     Wx, Wh, b = this.params
@@ -234,25 +236,32 @@ function backward!(this::LSTM,dhs)
 end
 function backward_dims_2!(this::LSTM,dh,T)
     dc = this.gpu_flg ? CUDA.zeros(size(dh)) : zeros(size(dh))
-    @inbounds @simd for t in T:-1:1
+    @inbounds for t in T:-1:1
         uni_layer = this.layers[t]
         this.dxs[:,t,:], dh, dc = backward!(uni_layer,dh,dc)
-
         #勾配合算 
         this.grads += uni_layer.grads
+        #dropoutの誤差逆伝播
+        if this.dropout !== nothing
+            dh = backward!(this.dropout,dh)
+            dc = backward!(this.dropout,dc)
+        end
     end
-    this.dh = dh
     nothing
 end
 function backward_dims_3!(this::LSTM,dhs,T)
-    this.dh = this.gpu_flg ? CUDA.zeros(size(dhs[:,1,:])) : zeros(size(dhs[:,1,:]))
+    dh = this.gpu_flg ? CUDA.zeros(size(dhs[:,1,:])) : zeros(size(dhs[:,1,:]))
     dc = this.gpu_flg ? CUDA.zeros(size(dhs[:,1,:])) : zeros(size(dhs[:,1,:]))
     @inbounds @simd for t in T:-1:1
         uni_layer = this.layers[t]
-        this.dxs[:,t,:], this.dh, dc = backward!(uni_layer,view(dhs,:,t,:)+this.dh, dc)
-
+        this.dxs[:,t,:], dh, dc = backward!(uni_layer,view(dhs,:,t,:)+dh, dc)
         #勾配合算 
         this.grads += uni_layer.grads
+        #dropoutの誤差逆伝播
+        if this.dropout !== nothing
+            dh = backward!(this.dropout,dh)
+            dc = backward!(this.dropout,dc)
+        end
     end
     nothing
 end
@@ -266,7 +275,6 @@ function convert_to_cu!(this::LSTM)
     this.gpu_flg = true
     this.layers = nothing
     this.dxs = nothing
-    this.dh = nothing
     if this.c !== nothing
         this.c = cu(this.c)
         this.h = cu(this.h)
@@ -282,7 +290,6 @@ function convert_to_array!(this::LSTM)
     this.gpu_flg = false
     this.layers = nothing
     this.dxs = nothing
-    this.dh = nothing
     if this.c !== nothing
         this.c = Array(this.c)
         this.h = Array(this.h)
@@ -304,7 +311,7 @@ mutable struct Sigmoid_with_loss
     Sigmoid_with_loss() = new([],[],nothing,nothing,false)
 end
 function forward!(this::Sigmoid_with_loss,in,learn_flg)
-    s = 1.0 ./ (1.0 .+ exp.(-in))
+    s = 1 ./ (1 .+ exp.(-in))
     delta = 1e-7
     this.s = s
     if !learn_flg
@@ -321,21 +328,27 @@ function reset!(this::Sigmoid_with_loss)
     this.t = nothing
 end
 function convert_to_cu!(this::Sigmoid_with_loss)
-    this.params = cu.(this.params)
-    this.grads = cu.(this.grads)
+    this.params = cu(this.params)
+    this.grads = cu(this.grads)
     this.gpu_flg = true
+    this.s = nothing
+    this.t = nothing
     nothing
 end
 function convert_to_array!(this::Sigmoid_with_loss)
-    this.params = Array.(this.params)
-    this.grads = Array.(this.grads)
+    this.params = Array(this.params)
+    this.grads = Array(this.grads)
     this.gpu_flg = false
+    this.s = nothing
+    this.t = nothing
     nothing
 end
 
 #====dropout===========================#
 #===
-・活性化関数の後に適応する
+・LSTMに適応する場合
+    通常：各時刻の出力に，異なるmaskをかける
+    変分：LSTM内部に共通のmask，外部も共通mask(生成したmaskの[:,1,:]を使う)
 ===#
 mutable struct Dropout
     params
@@ -343,44 +356,47 @@ mutable struct Dropout
     mask
     ratio
     gpu_flg
-    function Dropout(ratio)
-        new([],[],nothing,ratio,false)
+    variational_flg #変分=>T方向へ
+    function Dropout(ratio,variational_flg=false)
+        new([],[],nothing,ratio,false,variational_flg)
     end
 end
 function forward!(this::Dropout,x,learn_flg)
     s = size(x)
-    this.mask = rand(s[1],s[end])
+    this.mask = rand(Float64,s)
     this.mask = map(x->(x.>this.ratio ? 1.0 : 0.0),this.mask)
     if this.gpu_flg
         this.mask = cu(this.mask)
     end
     if learn_flg
-        if length(s) == 3
+        #学習
+        if this.variational_flg #変分
             for i in 1:s[2]
-                view(x,:,i,:) .*= this.mask
+                view(x,:,i,:) .*= view(this.mask,:,1,:) #各時刻に同じmaskを使用
             end
             return x
         end
-        return x .*= this.mask #学習
+        return x .*= this.mask #通常
     else
-        return  x *= (1.0 - this.ratio) #推論
+        return  x .*= (1.0 - this.ratio) #推論
     end
 end
 function backward!(this::Dropout,dx)
-    if length(size(dx)) == 3
-        for i in 1:size(dx,2)
-            view(dx,:,i,:) .*= this.mask
+    s = size(dx)
+    if this.variational_flg #変分
+        for i in 1:s[2]
+            view(dx,:,i,:) .*= view(this.mask,:,1,:) #各時刻に同じmaskを使用
         end
         return dx
     end
-    return dx .*= this.mask
+    return dx .*= this.mask #通常
 end
 function reset!(this::Dropout)
     nothing
 end
 function convert_to_cu!(this::Dropout)
-    this.params = cu.(this.params)
-    this.grads = cu.(this.grads)
+    this.params = cu(this.params)
+    this.grads = cu(this.grads)
     this.gpu_flg = true
     if this.mask !== nothing
         this.mask = cu(this.mask)
@@ -388,8 +404,8 @@ function convert_to_cu!(this::Dropout)
     nothing
 end
 function convert_to_array!(this::Dropout)
-    this.params = Array.(this.params)
-    this.grads = Array.(this.grads)
+    this.params = Array(this.params)
+    this.grads = Array(this.grads)
     this.gpu_flg = false
     if this.mask !== nothing
         this.mask = Array(this.mask)

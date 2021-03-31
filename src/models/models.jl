@@ -131,6 +131,7 @@ function load_model(path,gpu_flg=false)
     end
     return model
 end
+
 #===
 ファイルの読み込み
 ===#
