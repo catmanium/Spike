@@ -26,12 +26,13 @@ mutable struct Adam <: Optimizer
 end
 function fit!(this::Adam,model::Models)
     @inbounds for i in 1:length(model.common.layers)
-        for j in 1:length(model.common.layers[i].params)
-            params = model.common.layers[i].params[j]
-            if length(params)==0
-                continue
-            end
-            s = copy(params) * 0
+        params = model.common.layers[i].params
+        if params === nothing
+            continue
+        end
+        for j in 1:length(params)
+            param = params[j]
+            s = copy(param) * 0
             append!(this.vs,[s])
             append!(this.ss,[s])
         end
@@ -42,13 +43,14 @@ end
 function update!(this::Adam,model::Models)
     cnt = 1
     @inbounds for i in 1:length(model.common.layers)
-        for j in 1:length(model.common.layers[i].grads)
-            grads = model.common.layers[i].grads[j]
-            if length(grads)==0
-                continue
-            end
-            v = this.p1 .* this.vs[cnt] .+ (1-this.p1).*grads
-            s = this.p2 .* this.ss[cnt] .+ (1-this.p2).*(grads .^2)
+        grads = model.common.layers[i].grads
+        if grads === nothing
+            continue
+        end
+        for j in 1:length(grads)
+            grad = grads[j]
+            v = this.p1 .* this.vs[cnt] .+ (1-this.p1).*grad
+            s = this.p2 .* this.ss[cnt] .+ (1-this.p2).*(grad .^2)
             model.common.layers[i].params[j] .-= this.learning_rate*(v./sqrt.(this.e .+s))
             this.vs[cnt] = v
             this.ss[cnt] = s 

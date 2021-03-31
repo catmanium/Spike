@@ -308,7 +308,7 @@ mutable struct Sigmoid_with_loss
     s #スコア
     t
     gpu_flg
-    Sigmoid_with_loss() = new([],[],nothing,nothing,false)
+    Sigmoid_with_loss() = new(nothing,nothing,nothing,nothing,false)
 end
 function forward!(this::Sigmoid_with_loss,in,learn_flg)
     s = 1 ./ (1 .+ exp.(-in))
@@ -328,16 +328,12 @@ function reset!(this::Sigmoid_with_loss)
     this.t = nothing
 end
 function convert_to_cu!(this::Sigmoid_with_loss)
-    this.params = cu(this.params)
-    this.grads = cu(this.grads)
     this.gpu_flg = true
     this.s = nothing
     this.t = nothing
     nothing
 end
 function convert_to_array!(this::Sigmoid_with_loss)
-    this.params = Array(this.params)
-    this.grads = Array(this.grads)
     this.gpu_flg = false
     this.s = nothing
     this.t = nothing
@@ -358,7 +354,7 @@ mutable struct Dropout
     gpu_flg
     variational_flg #変分=>T方向へ
     function Dropout(ratio,variational_flg=false)
-        new([],[],nothing,ratio,false,variational_flg)
+        new(nothing,nothing,nothing,ratio,false,variational_flg)
     end
 end
 function forward!(this::Dropout,x,learn_flg)
@@ -395,8 +391,6 @@ function reset!(this::Dropout)
     nothing
 end
 function convert_to_cu!(this::Dropout)
-    this.params = cu(this.params)
-    this.grads = cu(this.grads)
     this.gpu_flg = true
     if this.mask !== nothing
         this.mask = cu(this.mask)
@@ -404,8 +398,6 @@ function convert_to_cu!(this::Dropout)
     nothing
 end
 function convert_to_array!(this::Dropout)
-    this.params = Array(this.params)
-    this.grads = Array(this.grads)
     this.gpu_flg = false
     if this.mask !== nothing
         this.mask = Array(this.mask)
