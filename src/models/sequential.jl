@@ -24,7 +24,7 @@ function learn!(model::Models;data,t_data,window_size,max_epoch,verification_par
         ite_total_loss = 0 #損失合計
         avg_loss = 0 #1エポックの平均損失
         model.common.now_epoch = epoch
-        @inbounds @simd for ite in 1:max_ite
+        @inbounds for ite in 1:max_ite
             #ミニバッチ作成
             st = Int(1+(ite-1)*T) #data切り取り位置
             ed = Int(T*ite)
