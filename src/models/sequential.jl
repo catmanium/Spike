@@ -62,7 +62,7 @@ function learn!(model::Models;data,t_data,window_size,max_epoch,verification_par
 
         if notebook 
             IJulia.clear_output(true)
-            plot(model.common.learn_plot) |> display
+            # plot(model.common.learn_plot) |> display
         else
             print("\e[1E")
         end
