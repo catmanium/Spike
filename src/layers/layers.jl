@@ -203,10 +203,10 @@ function forward!(this::LSTM,xs,learn_flg)
     end
 
     #uni_LSTMの初期化
-    uni_layer = uni_LSTM(this.params,this.grads.*0)
-    this.layers = fill(uni_layer,T)
+    this.layers = Array{uni_LSTM}(undef,T)
 
     @inbounds for t in 1:T
+        this.layers[t] = uni_LSTM(this.params,this.grads.*0)
         this.h, this.c = forward!(this.layers[t],view(xs,:,t,:),this.h,this.c)
         hs[:,t,:] = this.h #次レイヤへの伝播用
         if this.dropout !== nothing
