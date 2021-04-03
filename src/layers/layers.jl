@@ -204,6 +204,10 @@ function forward!(this::LSTM,xs,learn_flg)
 
     #uni_LSTMの初期化
     this.layers = Array{uni_LSTM}(undef,T)
+    
+    if this.gpu_flg
+        this.dropout.gpu_flg = true
+    end
 
     @inbounds for t in 1:T
         this.layers[t] = uni_LSTM(this.params,this.grads.*0)
