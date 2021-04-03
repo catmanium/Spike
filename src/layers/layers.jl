@@ -211,10 +211,13 @@ function forward!(this::LSTM,xs,learn_flg)
         hs[:,t,:] = this.h #次レイヤへの伝播用
         if this.dropout !== nothing
             #dropoutをかけるのはuni_LSTMに渡す値のみ(次レイヤへは別のdropoutを使う)
-            this.h = forward!(this.dropout,this.h,learn_flg)
-            this.c = forward!(this.dropout,this.c,learn_flg)
+            this.h = forward!(this.dropout,this.h,learn_flg,false)
+            this.c = forward!(this.dropout,this.c,learn_flg,false)
         end
     end
+
+    #Dropoutのマスクのシャッフル
+    this.dropout.mask = shuffle(this.dropout.mask)
 
     return this.out_sequence ? hs : hs[:,end,:] #hs{N,T,H}
 end
@@ -369,7 +372,7 @@ mutable struct Dropout
         new(nothing,nothing,nothing,ratio,false,variational_flg)
     end
 end
-function forward!(this::Dropout,x,learn_flg)
+function forward!(this::Dropout,x,learn_flg,shuffle_flg=true)
     if !learn_flg
         return  x .*= (1.0 - this.ratio) #推論
     end
@@ -386,7 +389,9 @@ function forward!(this::Dropout,x,learn_flg)
             this.mask = cu(this.mask)
         end
     else
-        this.mask = shuffle(this.mask)
+        if shuffle_flg
+            this.mask = shuffle(this.mask)
+        end
     end
 
     return x .*= this.mask #学習
