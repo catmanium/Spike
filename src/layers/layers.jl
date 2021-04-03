@@ -343,8 +343,20 @@ end
 #====dropout===========================#
 #===
 ・LSTMに適応する場合
-    通常：各時刻の出力に，異なるmaskをかける
+    通常：LSTMの出力に，異なるmaskをかける
+        LSTM
+        ↑
+        Dropout(0.5) dims=3
+        ↑
+        LSTM
+
     変分：LSTM内部に共通のmask，外部も共通mask(生成したmaskの[:,1,:]を使う)
+        LSTM(Dropout(0.5)) dims=2
+        ↑
+        Dropout(0.5,true) dims=2,各時刻に同じmask
+        ↑
+        LSTM(Dropout(0.5)) dims=2
+
 ===#
 mutable struct Dropout
     params
@@ -358,33 +370,28 @@ mutable struct Dropout
     end
 end
 function forward!(this::Dropout,x,learn_flg)
-    s = size(x)
-    this.mask = rand(Float64,s)
-    this.mask = map(x->(x.>this.ratio ? 1.0 : 0.0),this.mask)
-    if this.gpu_flg
-        this.mask = cu(this.mask)
-    end
-    if learn_flg
-        #学習
-        if this.variational_flg #変分
-            for i in 1:s[2]
-                view(x,:,i,:) .*= view(this.mask,:,1,:) #各時刻に同じmaskを使用
-            end
-            return x
-        end
-        return x .*= this.mask #通常
-    else
+    if !learn_flg
         return  x .*= (1.0 - this.ratio) #推論
     end
+
+    if this.mask === nothing
+        s = size(x)
+        if this.variational_flg
+            this.mask = rand(Float64,s[1],1,s[3]) #変分(LSTMの外側)
+        else
+            this.mask = rand(Float64,s) #通常
+        end
+        this.mask = map(x->(x.>this.ratio ? 1.0 : 0.0),this.mask)
+        if this.gpu_flg
+            this.mask = cu(this.mask)
+        end
+    else
+        this.mask = shuffle(this.mask)
+    end
+
+    return x .*= this.mask #学習
 end
 function backward!(this::Dropout,dx)
-    s = size(dx)
-    if this.variational_flg #変分
-        for i in 1:s[2]
-            view(dx,:,i,:) .*= view(this.mask,:,1,:) #各時刻に同じmaskを使用
-        end
-        return dx
-    end
     return dx .*= this.mask #通常
 end
 function reset!(this::Dropout)

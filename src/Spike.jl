@@ -7,7 +7,7 @@ Pkg.resolve()
 共通パッケージ
 ===#
 
-using CUDA,UnPack,CSV,DataFrames,JSON,JLD2,FileIO,ProgressMeter,Plots,IJulia,LinearAlgebra
+using CUDA,UnPack,CSV,DataFrames,JSON,JLD2,FileIO,ProgressMeter,Plots,IJulia,LinearAlgebra,Random
 
 #===
 全ファイル共通
