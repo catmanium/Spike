@@ -389,8 +389,13 @@ function forward!(this::Dropout,x,learn_flg,shuffle_flg=true)
             this.mask = cu(this.mask)
         end
     else
-        if shuffle_flg
-            this.mask = shuffle(this.mask)
+        if shuffle_flg #LSTM内部の時は無し
+            if this.gpu_flg
+                this.mask = cu(shuffle(Array(this.mask)))
+            else
+                this.mask = shuffle(this.mask)
+            end
+            
         end
     end
 
