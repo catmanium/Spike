@@ -204,10 +204,9 @@ function forward!(this::LSTM,xs,learn_flg)
 
     #uni_LSTMの初期化
     this.layers = Array{uni_LSTM}(undef,T)
-    
-    if this.gpu_flg
-        this.dropout.gpu_flg = true
-    end
+
+    #Dropoutのマスクのシャッフル(生成)
+    make_mask!(this.dropout,(N,H))
 
     @inbounds for t in 1:T
         this.layers[t] = uni_LSTM(this.params,this.grads.*0)
@@ -219,9 +218,6 @@ function forward!(this::LSTM,xs,learn_flg)
             this.c = forward!(this.dropout,this.c,learn_flg,false)
         end
     end
-
-    #Dropoutのマスクのシャッフル
-    this.dropout.mask = shuffle(this.dropout.mask)
 
     return this.out_sequence ? hs : hs[:,end,:] #hs{N,T,H}
 end
@@ -358,6 +354,7 @@ end
         LSTM
 
     変分：LSTM内部に共通のmask，外部も共通mask(生成したmaskの[:,1,:]を使う)
+    (内部でdropoutを使用したLSTMの入出力で使われる)
         LSTM(Dropout(0.5)) dims=2
         ↑
         Dropout(0.5,true) dims=2,各時刻に同じmask
@@ -381,28 +378,9 @@ function forward!(this::Dropout,x,learn_flg,shuffle_flg=true)
         return  x .*= (1.0 - this.ratio) #推論
     end
 
-    if this.mask === nothing
-        s = size(x)
-        if this.variational_flg
-            this.mask = rand(Float64,s[1],1,s[3]) #変分(LSTMの外側)
-        else
-            this.mask = rand(Float64,s) #通常
-        end
-        this.mask = map(x->(x.>this.ratio ? 1.0 : 0.0),this.mask)
-        if this.gpu_flg
-            this.mask = cu(this.mask)
-        end
-    else
-        if shuffle_flg #LSTM内部の時は無し
-            if this.gpu_flg
-                this.mask = rand(Float64,size(this.mask))
-                this.mask = map(x->(x.>this.ratio ? 1.0 : 0.0),this.mask)
-                this.mask = cu(this.mask)
-            else
-                this.mask = shuffle(this.mask)
-            end
-            
-        end
+    #LSTM内部のT方向の処理はshuffleしない（代わりに計算前に行う）
+    if shuffle_flg || size(this.mask) != size(x)
+        make_mask!(this,size(x))
     end
 
     return x .*= this.mask #学習
@@ -426,4 +404,27 @@ function convert_to_array!(this::Dropout)
         this.mask = Array(this.mask)
     end
     nothing
+end
+function make_mask!(this::Dropout,s)
+    #新しく作る
+    if this.mask === nothing || s != size(this.mask)
+        if this.variational_flg
+            this.mask = rand(Float64,s[1],1,s[3]) #変分
+        else
+            this.mask = rand(Float64,s) #通常
+        end
+        this.mask = map(x->(x.>this.ratio ? 1.0 : 0.0),this.mask)
+        if this.gpu_flg
+            this.mask = cu(this.mask)
+        end
+    else
+    #shuffle
+        if this.gpu_flg
+            this.mask = Array(this.mask)
+        end
+        this.mask = shuffle(this.mask)
+        if this.gpu_flg
+            this.mask = cu(this.mask)
+        end
+    end
 end
