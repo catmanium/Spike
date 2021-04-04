@@ -206,7 +206,9 @@ function forward!(this::LSTM,xs,learn_flg)
     this.layers = Array{uni_LSTM}(undef,T)
 
     #Dropoutのマスクのシャッフル(生成)
-    make_mask!(this.dropout,(N,H))
+    if this.dropout !== nothing
+        make_mask!(this.dropout,(N,H))
+    end
 
     @inbounds for t in 1:T
         this.layers[t] = uni_LSTM(this.params,this.grads.*0)
