@@ -18,8 +18,6 @@ function learn!(model::Models;data,t_data,window_size,max_epoch,verification_par
     model.common.loss = zeros(max_epoch)
     model.window_size = window_size
 
-    println("epoch: 0 | loss: 0 | ")
-
     @inbounds for epoch in 1:max_epoch
         ite_total_loss = 0 #損失合計
         avg_loss = 0 #1エポックの平均損失
@@ -51,7 +49,7 @@ function learn!(model::Models;data,t_data,window_size,max_epoch,verification_par
         if notebook 
             print(model.common.learn_io,"\n","\e[0F","\e[2K","epoch: ",epoch," | loss: ",avg_loss," | ")
         else
-            print(model.common.learn_io,"\e[1F","\e[2K","epoch: ",epoch," | loss: ",avg_loss," | ")
+            print(model.common.learn_io,"\n","epoch:",epoch," | ","loss:",avg_loss," | ")
         end
 
         #検証
@@ -64,7 +62,7 @@ function learn!(model::Models;data,t_data,window_size,max_epoch,verification_par
             IJulia.clear_output(true)
             plot(model.common.learn_plot) |> display
         else
-            print("\e[1E")
+            print(model.common.learn_io,"\e[2F") #上(プログレスバーの先頭へ)
         end
 
         take!(model.common.learn_io) |> String |> println
