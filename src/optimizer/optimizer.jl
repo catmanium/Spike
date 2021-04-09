@@ -10,7 +10,74 @@
 ・全ての構造体はOptimizerの子型になる
 ===#
 
-export Adam,update!
+export SGD,Momentum,Adam,update!
+
+#===SGD==============#
+mutable struct SGD <: Optimizer
+    learning_rate
+    function SGD(;learning_rate=0.001)
+        new(learning_rate)
+    end
+end
+function fit!(this::SGD,model::Models)
+    model.common.optimizer = this
+end
+function update!(this::SGD,model::Models)
+    cnt = 1
+    @inbounds for i in 1:length(model.common.layers)
+        grads = model.common.layers[i].grads
+        if grads === nothing
+            continue
+        end
+        for j in 1:length(grads)
+            grad = grads[j]
+            model.common.layers[i].params[j] .-= this.learning_rate*grad
+            cnt+=1
+        end
+    end
+    nothing
+end
+
+#===Momentum=========#
+mutable struct Momentum <: Optimizer
+    learning_rate
+    vs #速度
+    momentum
+    function Momentum(;learning_rate=0.001,momentum=0.8)
+        new(learning_rate,[],momentum)
+    end
+end
+function fit!(this::Momentum,model::Models)
+    @inbounds for i in 1:length(model.common.layers)
+        params = model.common.layers[i].params
+        if params === nothing
+            continue
+        end
+        for j in 1:length(params)
+            param = params[j]
+            s = copy(param) * 0
+            append!(this.vs,[s])
+        end
+    end
+    model.common.optimizer = this
+    nothing
+end
+function update!(this::Momentum,model::Models)
+    cnt = 1
+    @inbounds for i in 1:length(model.common.layers)
+        grads = model.common.layers[i].grads
+        if grads === nothing
+            continue
+        end
+        for j in 1:length(grads)
+            grad = grads[j]
+            this.vs[cnt] = this.momentum * this.vs[cnt] - this.learning_rate * grad
+            model.common.layers[i].params[j] .+= this.vs[cnt]
+            cnt+=1
+        end
+    end
+    nothing
+end
 
 #====Adam============#
 mutable struct Adam <: Optimizer
