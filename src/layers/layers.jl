@@ -95,6 +95,7 @@ end
 function forward!(this::uni_LSTM,x,h_prev,c_prev)
     #x{N,D}, h_prev{N,H}, c_prev{N,H}
     Wx, Wh, b = this.params #{D*4H,H*4H,1*4H}
+    gpu_flg = this.gpu_flg
     N = size(x,1)
     H = size(h_prev,2)
     
@@ -102,9 +103,9 @@ function forward!(this::uni_LSTM,x,h_prev,c_prev)
 
     #N,4H
     if A === nothing || size(A) != (N,4H)
-        A = zeros(N,4H)
-        x_Wx = zeros(N,4H)
-        h_Wh = zeros(N,4H)
+        A = gpu_flg ? CUDA.zeros(4,4H) : zeros(N,4H)
+        x_Wx = gpu_flg ? CUDA.zeros(4,4H) : zeros(N,4H)
+        h_Wh = gpu_flg ? CUDA.zeros(4,4H) : zeros(N,4H)
         this.cache.A = A
         this.cache.x_Wx = x_Wx
         this.cache.h_Wh = h_Wh
@@ -134,6 +135,7 @@ end
 function backward!(this::uni_LSTM,dh_next,dc_next)
     @unpack A = this.cache #dA
 
+    gpu_flg = this.gpu_flg
     Wx, Wh, b = this.params
     i = this.i
     f = this.f
@@ -148,7 +150,7 @@ function backward!(this::uni_LSTM,dh_next,dc_next)
     N,H = size(i)
     #N,4H
     if A === nothing || size(A) != (N,4H)
-        A = zeros(N,4H)
+        A = gpu_flg ? CUDA.zeros(4,4H) : zeros(N,4H)
         this.cache.A = A
     end
     
@@ -231,7 +233,7 @@ function forward!(this::LSTM,xs,learn_flg)
 
     hs = similar(xs,N,T,H)
 
-    if !stateful || this.h === nothing
+    if !stateful || this.h === nothing || typeof(this.h)
         this.h = gpu_flg ? CUDA.zeros(N,H) : zeros(N,H)
     end
     if !stateful || this.c === nothing
