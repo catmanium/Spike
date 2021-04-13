@@ -102,9 +102,9 @@ function forward!(this::uni_LSTM,x,h_prev,c_prev)
 
     #N,4H
     if A === nothing || size(A) != (N,4H)
-        A = gpu_flg ? CUDA.zeros(4,4H) : zeros(N,4H)
-        x_Wx = gpu_flg ? CUDA.zeros(4,4H) : zeros(N,4H)
-        h_Wh = gpu_flg ? CUDA.zeros(4,4H) : zeros(N,4H)
+        A = gpu_flg ? CUDA.zeros(N,4H) : zeros(N,4H)
+        x_Wx = gpu_flg ? CUDA.zeros(N,4H) : zeros(N,4H)
+        h_Wh = gpu_flg ? CUDA.zeros(N,4H) : zeros(N,4H)
         this.cache.A = A
         this.cache.x_Wx = x_Wx
         this.cache.h_Wh = h_Wh
@@ -149,7 +149,7 @@ function backward!(this::uni_LSTM,dh_next,dc_next)
     N,H = size(i)
     #N,4H
     if A === nothing || size(A) != (N,4H)
-        A = gpu_flg ? CUDA.zeros(4,4H) : zeros(N,4H)
+        A = gpu_flg ? CUDA.zeros(N,4H) : zeros(N,4H)
         this.cache.A = A
     end
     
