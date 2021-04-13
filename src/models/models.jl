@@ -43,7 +43,8 @@ cuは引数の前にしておく
 function predict!(model::Models,data,learn_flg=false)
     out = data
 
-    @inbounds @simd for layer in model.common.layers
+    @inbounds @simd for i in 1:length(model.common.layers)
+        layer = get_layers(model,i)
         out = forward!(layer,out,learn_flg)
     end
 

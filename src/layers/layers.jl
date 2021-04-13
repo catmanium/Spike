@@ -19,6 +19,15 @@ export Affine,LSTM,Sigmoid_with_loss,Dropout
 ・gpu_flg は add_layer!()で処理してる
 ===#
 
+#===
+計算
+・計算式をつなげる場合は@.を付ける
+====#
+
+#===
+cacheは各structを作成し，保持
+===#
+
 #=====Affine==============#
 mutable struct Affine <: Layers
     params #W,b
@@ -76,8 +85,11 @@ mutable struct uni_LSTM <: Layers
     o
     c_next
     gpu_flg
-    function uni_LSTM(params,grads)
-        new(params,grads,nothing,nothing,nothing,nothing,nothing,nothing,nothing,nothing,false)
+    #==cache==#
+    cache
+    function uni_LSTM(params,grads,cache)
+        new(params,grads,nothing,nothing,nothing,nothing,nothing,
+        nothing,nothing,nothing,false,cache)
     end
 end
 function forward!(this::uni_LSTM,x,h_prev,c_prev)
@@ -85,32 +97,43 @@ function forward!(this::uni_LSTM,x,h_prev,c_prev)
     Wx, Wh, b = this.params #{D*4H,H*4H,1*4H}
     N = size(x,1)
     H = size(h_prev,2)
+    
+    @unpack A,x_Wx,h_Wh = this.cache
 
     #N,4H
-    A = x * Wx + h_prev * Wh .+ b
+    if A === nothing || size(A) != (N,4H)
+        A = zeros(N,4H)
+        x_Wx = zeros(N,4H)
+        h_Wh = zeros(N,4H)
+        this.cache.A = A
+        this.cache.x_Wx = x_Wx
+        this.cache.h_Wh = h_Wh
+    end
+
+    mul!(x_Wx,x,Wx)
+    mul!(h_Wh,h_prev,Wh)
+    A .= x_Wx .+ h_Wh .+ b
 
     #それぞれ{N,H}
-    f = 1 ./ (1 .+ exp.(-(view(A,:,1:H)))) #Sigmoid
-    g = tanh.(view(A,:,H+1:2*H))
-    i = 1 ./ (1 .+ exp.(-(view(A,:,2*H+1:3*H))))
-    o = 1 ./ (1 .+ exp.(-(view(A,:,3*H+1:size(A,2)))))
+    this.f = 1 ./ (1 .+ exp.(-(view(A,:,1:H)))) #Sigmoid
+    this.g = tanh.(view(A,:,H+1:2*H))
+    this.i = 1 ./ (1 .+ exp.(-(view(A,:,2*H+1:3*H))))
+    this.o = 1 ./ (1 .+ exp.(-(view(A,:,3*H+1:size(A,2)))))
 
-    c_next = f .* c_prev + g .* i #N,H
+    c_next = this.f .* c_prev .+ this.g .* this.i #N,H
 
-    h_next = o .* tanh.(c_next) #N,H
+    h_next = this.o .* tanh.(c_next) #N,H
 
     this.x = x
     this.h_prev = h_prev #N,H
     this.c_prev = c_prev #N,H
-    this.i = i
-    this.f = f
-    this.g = g
-    this.o = o
     this.c_next = c_next
 
     return h_next, c_next
 end
 function backward!(this::uni_LSTM,dh_next,dc_next)
+    @unpack A = this.cache #dA
+
     Wx, Wh, b = this.params
     i = this.i
     f = this.f
@@ -118,28 +141,31 @@ function backward!(this::uni_LSTM,dh_next,dc_next)
     o = this.o
 
     tanh_c_next = tanh.(this.c_next)
-    ds = dc_next + (dh_next .* o) .* (1 .- tanh_c_next.^2)
+    ds = dc_next .+ (dh_next .* o) .* (1 .- tanh_c_next.^2)
 
     dc_prev = ds .* f
 
-    di = ds .* g .* i .* (1 .- i)
-    df = ds .* this.c_prev .* f .* (1 .- f)
-    d_o = dh_next .* tanh_c_next .* o .* (1 .- o)
-    dg = ds .* i .* (1 .- g.^2)
+    N,H = size(i)
+    #N,4H
+    if A === nothing || size(A) != (N,4H)
+        A = zeros(N,4H)
+        this.cache.A = A
+    end
+    
+    A[:,2H+1:3H] = ds .* g .* i .* (1 .- i)
+    A[:,1:H] = ds .* this.c_prev .* f .* (1 .- f)
+    A[:,3H+1:4H] = dh_next .* tanh_c_next .* o .* (1 .- o)
+    A[:,H+1:2H] = ds .* i .* (1 .- g.^2)
 
-    dA = hcat(df,dg,di,d_o)
+    # this.A .= hcat(df,dg,di,d_o)
 
-    # mul!(this.grads[1],copy(this.x'),dA)
-    this.grads[1] = (dA' * this.x)'
-    this.grads[2] = this.h_prev' * dA
-    # mul!(this.grads[2],this.h_prev',dA)
+    this.grads[1] = (A' * this.x)'
+    this.grads[2] = this.h_prev' * A
 
-    this.grads[3] .= sum(dA,dims=1)
+    this.grads[3] .= sum(A,dims=1)
 
-    # mul!(this.dx,dA,Wx')
-    # mul!(this.dh_prev,dA,Wh')
-    dx = dA * Wx'
-    dh_prev = dA * Wh'
+    dx = A * Wx'
+    dh_prev = A * Wh'
 
     return dx, dh_prev, dc_prev
 end
@@ -153,6 +179,14 @@ end
 Dropoutを引数に渡すと，時系列方向にも適応できる(p.265)
 
 ===#
+mutable struct LSTM_cache
+    A
+    x_Wx
+    h_Wh
+    function LSTM_cache()
+        new(nothing,nothing,nothing)
+    end
+end
 mutable struct LSTM
     params #Wx,Wh,b
     grads #dWx,dWh,db
@@ -164,6 +198,7 @@ mutable struct LSTM
     dxs
     dropout
     gpu_flg
+    cache
     function LSTM(input,output;stateful=true,out_sequence=true,dropout=nothing)
         Wx = randn(input,4*output)/sqrt(input)
         Wh = randn(output,4*output)/sqrt(output)
@@ -182,7 +217,8 @@ mutable struct LSTM
             out_sequence,
             nothing,
             dropout,
-            false
+            false,
+            LSTM_cache()
         )
     end
 end
@@ -211,7 +247,7 @@ function forward!(this::LSTM,xs,learn_flg)
     end
 
     @inbounds for t in 1:T
-        this.layers[t] = uni_LSTM(this.params,this.grads.*0)
+        this.layers[t] = uni_LSTM(this.params,this.grads.*0,this.cache)
         this.h, this.c = forward!(this.layers[t],view(xs,:,t,:),this.h,this.c)
         hs[:,t,:] = this.h #次レイヤへの伝播用
         if this.dropout !== nothing
@@ -323,11 +359,11 @@ function forward!(this::Sigmoid_with_loss,in,learn_flg)
         #ただの推論
         return s
     end
-    l = -this.t .* log.(delta.+s) - (1 .-this.t) .* log.(1+delta .-s)
+    l = -this.t .* log.(delta.+s) .- (1 .-this.t) .* log.(1+delta .-s)
     return l
 end
 function backward!(this::Sigmoid_with_loss,din)
-    return this.s - this.t
+    return this.s .- this.t
 end
 function reset!(this::Sigmoid_with_loss)
     this.t = nothing
