@@ -85,11 +85,10 @@ mutable struct uni_LSTM <: Layers
     o
     c_next
     gpu_flg
-    #==cache==#
     cache
-    function uni_LSTM(params,grads,cache)
+    function uni_LSTM(params,grads,cache,gpu_flg)
         new(params,grads,nothing,nothing,nothing,nothing,nothing,
-        nothing,nothing,nothing,false,cache)
+        nothing,nothing,nothing,gpu_flg,cache)
     end
 end
 function forward!(this::uni_LSTM,x,h_prev,c_prev)
@@ -249,7 +248,7 @@ function forward!(this::LSTM,xs,learn_flg)
     end
 
     @inbounds for t in 1:T
-        this.layers[t] = uni_LSTM(this.params,this.grads.*0,this.cache)
+        this.layers[t] = uni_LSTM(this.params,this.grads.*0,this.cache,gpu_flg)
         this.h, this.c = forward!(this.layers[t],view(xs,:,t,:),this.h,this.c)
         hs[:,t,:] = this.h #次レイヤへの伝播用
         if this.dropout !== nothing
