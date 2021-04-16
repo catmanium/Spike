@@ -317,6 +317,11 @@ function convert_to_cu!(this::LSTM)
     this.gpu_flg = true
     this.layers = nothing
     this.dxs = nothing
+    #==cache==#
+    this.cache.A = cu(this.cache.A)
+    this.cache.x_Wx = cu(this.cache.x_Wx)
+    this.cache.h_Wh = cu(this.cache.h_Wh) 
+    
     if this.c !== nothing
         this.c = cu(this.c)
         this.h = cu(this.h)
@@ -332,6 +337,11 @@ function convert_to_array!(this::LSTM)
     this.gpu_flg = false
     this.layers = nothing
     this.dxs = nothing
+    #==cache==#
+    this.cache.A = Array(this.cache.A)
+    this.cache.x_Wx = Array(this.cache.x_Wx)
+    this.cache.h_Wh = Array(this.cache.h_Wh) 
+
     if this.c !== nothing
         this.c = Array(this.c)
         this.h = Array(this.h)
