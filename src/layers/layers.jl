@@ -318,10 +318,12 @@ function convert_to_cu!(this::LSTM)
     this.layers = nothing
     this.dxs = nothing
     #==cache==#
-    this.cache.A = cu(this.cache.A)
-    this.cache.x_Wx = cu(this.cache.x_Wx)
-    this.cache.h_Wh = cu(this.cache.h_Wh) 
-    
+    if this.cache.A !== nothing
+        this.cache.A = cu(this.cache.A)
+        this.cache.x_Wx = cu(this.cache.x_Wx)
+        this.cache.h_Wh = cu(this.cache.h_Wh) 
+    end
+
     if this.c !== nothing
         this.c = cu(this.c)
         this.h = cu(this.h)
@@ -338,10 +340,11 @@ function convert_to_array!(this::LSTM)
     this.layers = nothing
     this.dxs = nothing
     #==cache==#
-    this.cache.A = Array(this.cache.A)
-    this.cache.x_Wx = Array(this.cache.x_Wx)
-    this.cache.h_Wh = Array(this.cache.h_Wh) 
-
+    if this.cache.A !== nothing
+        this.cache.A = Array(this.cache.A)
+        this.cache.x_Wx = Array(this.cache.x_Wx)
+        this.cache.h_Wh = Array(this.cache.h_Wh)      
+    end
     if this.c !== nothing
         this.c = Array(this.c)
         this.h = Array(this.h)

@@ -1,4 +1,4 @@
-export predict!,backward!,add_layer!,add_optimizer!,get_layers,get_params,get_loss,get_now_epoch,save_model,load_model,reset!,convert_to_array,convert_to_cu
+export predict!,backward!,add_layer!,add_optimizer!,get_layers,get_params,get_loss,get_now_epoch,save_model,load_model,reset!,convert_to_array,convert_to_cu,get_optimizer
 #===
 共通型，関数
 ・全てのモデルはModelCommonをcommonに持ち，Modelsの子型になる
@@ -79,11 +79,17 @@ function reset!(model::Models)
 end
 
 function convert_to_cu!(model::Models)
+    #optimizer
+    convert_to_cu!(get_optimizer(model),model)
+    #レイヤ
     @inbounds for i in 1:length(model.common.layers)
         convert_to_cu!(model.common.layers[i])
     end
 end
 function convert_to_array!(model::Models)
+    #optimizer
+    convert_to_array!(get_optimizer(model),model)
+    #レイヤ
     @inbounds for i in 1:length(model.common.layers)
         convert_to_array!(model.common.layers[i])
     end
@@ -110,6 +116,9 @@ function get_params(model::Models,n=nothing)
     else
         return model.common.layers[n].params
     end
+end
+function get_optimizer(model::Models)
+    return model.common.optimizer
 end
 
 function save_model(model::Models,path)

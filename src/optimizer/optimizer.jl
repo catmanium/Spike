@@ -37,6 +37,12 @@ function update!(this::SGD,model::Models)
     end
     nothing
 end
+function convert_to_cu!(this::SGD,model::Models)
+    return nothing
+end
+function convert_to_array!(this::SGD,model::Models)
+    return nothing
+end
 
 #===Momentum=========#
 mutable struct Momentum <: Optimizer
@@ -77,6 +83,14 @@ function update!(this::Momentum,model::Models)
         end
     end
     nothing
+end
+function convert_to_cu!(this::Momentum,model::Models)
+    this.vs = cu.(this.vs)
+    return nothing
+end
+function convert_to_array!(this::Momentum,model::Models)
+    this.vs = Array.(this.vs)
+    return nothing
 end
 
 #====Adam============#
@@ -125,4 +139,14 @@ function update!(this::Adam,model::Models)
         end
     end
     nothing
+end
+function convert_to_cu!(this::Adam,model::Models)
+    this.vs = cu.(this.vs)
+    this.ss = cu.(this.ss)
+    return nothing
+end
+function convert_to_array!(this::Adam,model::Models)
+    this.vs = Array.(this.vs)
+    this.ss = Array.(this.ss)
+    return nothing
 end
